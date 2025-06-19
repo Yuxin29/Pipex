@@ -10,15 +10,13 @@
 #                                                                              #
 # **************************************************************************** #
 
-NAME := push_swap
+NAME := pipex
 CFLAGS := -Wall -Wextra -Werror
 CC := cc
 
-SRCS := firststep_dealinput.c \
-	ft_operations.c \
-	push_swap_by_size.c \
-	sort_big.c \
-	finalstep_main.c \
+SRCS := io.c \
+	cmd.c \
+	main.c \
 
 OBJS := $(SRCS:%.c=%.o)
 
