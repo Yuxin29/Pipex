@@ -10,27 +10,63 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-// the relationship of fork and parent/child process
-
-/*
-Parent Process (main)
-               |
-    -------------------------------
-    |                             |
-fork()                         fork()
-    |                             |
-Child 1 (exec cmd1)         Child 2 (exec cmd2)
+/* ----------------examples------------------------
+./pipex infile "grep hello" "wc -l" outfile
+------------------------------------------------------------
+                 Parent Process (main)
+                    (creates pipe)
+                        |
+          ---------------------------------
+          |                               |
+       fork() [child1_pid]            fork() [child2_pid]
+          |                               |
+  ---------------------         ---------------------
+  |                   |         |                   |
+Child 1           Parent      Child 2            Parent
+(exec cmd1)      after fork1  (exec cmd2)       after fork2
+  |                   |         |                   |
+  |                   |         |                   |
+┌----------------─┐   |     ┌----------------────┐   |
+│ close(pipe_fd[0])│  |     │ close(pipe_fd[1])  │   |
+│ dup2(infile, 0)  │  |     │ dup2(pipe_fd[0], 0)│   |
+│ dup2(pipe_fd[1],1)│ |     │ dup2(outfile, 1)   │   |
+│ execve(cmd1)     │  |     │ execve(cmd2)       │   |
+└----------------──┘  |     └----------------────┘   |
+                      |                               |
+                 Parent closes both ends of pipe      |
+                 waitpid(child1_pid)                  |
+                 waitpid(child2_pid)                  |
+---------------------------------------------------
 */
 
+#include <string.h>
+
 //main process, excution function
-- av checker
-- check path and environments
-- create pipe
-- execute cmd1
-- execute cmd2
-- exit
-
-int	main(int ac, char **av)
+int main(int ac, char **av, char **envp)
 {
+    // Check argument count
+    if (ac != 5 || strcmp((const char)"pipex", (const char)av[0]) == 1)
+        return (0);
 
+    // Open files
+
+    // Create pipe: check path and environments
+
+    // --- First fork: cmd1 ---
+        // In child1: grep hello
+        // stdin ← infile
+        // stdout → pipe write
+        // Close unused read end
+        // av[2] = "grep hello"
+
+    // --- Second fork: cmd2 ---
+        // In child2: wc -l
+        // stdin ← pipe read
+        // stdout → outfile
+        // Close unused write end
+        // av[3] = "wc -l"
+
+    // Parent process
+    return (0);
 }
+

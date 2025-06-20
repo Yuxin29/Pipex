@@ -11,6 +11,11 @@
 /* ************************************************************************** */
 
 //input and output: io.c
+
+//io.c
+//├─ open_infile() (parent)
+//├─ open_outfile() (parent)
+
 int open_infile(const char *filename)
 {
 

@@ -24,47 +24,23 @@ for the cmd: I dont need to hard code it, they are ready from shell
 -----------------
 */
 
-//here is the whole process
-/*
-main.c
-├─ open files (parent)
-├─ create pipe (parent)
-├─ fork → exe_cmd1 (child)
-├─ fork → exe_cmd2 (child)
-├─ waitpid() (parent)
-
-cmd.c
-├─ exe_cmd1() → make_argv_array() → execve() (child1)
-├─ exe_cmd2() → make_argv_array() → execve() (child2)
-
-io.c
-├─ open_infile() (parent)
-├─ open_outfile() (parent)
-*/
-
 #ifndef PIPEX_H
 # define PIPEX_H
 
 # include<unistd.h>  //write
 # include<stdlib.h>  //malloc, free
 
-//input and output: io.c
+//io.c: input and output
 int open_infile(const char *filename);
 int open_outfile(const char *filename);
 
-//get and execute cmds: cmd.c
-char **make_argv_array(char *command_str);
+//cmd.c get and execute cmds
+char **make_cmd_array(char *command_str);
 char *find_path_in_envp(char **envp); 
 char *find_command_in_path(char *cmd, char *path);
-void exe_cmd1(input, cmd1, output);
-void exe_cmd1(input, cmd2, output);
+void exe_cmd(input, cmd, output);
 
-//main process, excution function: main.c
-- av checker
-- check path and environments
-- create pipe
-- execute cmd1
-- execute cmd2
-- exit
+//main.c: main process, excution function
+int main(int ac, char **av, char **envp);
 
 #endif
