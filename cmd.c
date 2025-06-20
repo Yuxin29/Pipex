@@ -12,24 +12,21 @@
 
 //get and execute cmds
 //for the cmd: I dont need to hard code it, they are ready from shell
-
 // Split "grep hello" → {"grep", "hello", NULL}
+
+//ft_split
+//char	**ft_split(char const *s, char c)
+
 char **make_cmd_array(char *command_str)
 {
-    //I should use split here.
+    char    **line;
+    char    space;
 
-}
-
-// Find PATH=... from envp
-char *find_path_in_envp(char **envp)
-{
-    // example: envp = {"SHELL=/bin/bash", "PATH=/usr/local/bin:/usr/bin:/bin", NULL}
-    //output : "/usr/local/bin:/usr/bin:/bin"
-    //grep could be: 
-    - /usr/local/bin/grep
-    - /usr/bin/grep
-    - /bin/grep
-
+    space = ' ';
+    line = ft_split(char const command_str, space)
+    if (!line)
+        return (NULL);
+    return (line);
 }
 
  // Searches for the actual binary executable file for cmd inside all directories from the PATH string.
@@ -39,9 +36,9 @@ char *find_command_in_path(char *cmd, char *path)
     - cmd = "grep"
     - path = "/usr/local/bin:/usr/bin:/bin"
 
-    //esim. putput 
+    //esim. output 
     - "/bin/grep"
-    //need to find this actualpath
+    //it searches through each path directory to see where the actual binary (like /usr/bin/grep) exists.
 }
 
 // Parses & execs single command: here eg it runs grep
