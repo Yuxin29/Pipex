@@ -1,3 +1,49 @@
+					a tree structure of how the main.c work
+--------------------------------------------------------------------------------
+|						    Parent Process 									   |
+|						   	   {main}										   |
+|                   		(creates pipe)									   |
+|                        		|											   |
+|	         		-----------------------------------						   |
+|   	    		|                        	       |					   |
+|			{first_fork} 							{second_fork} 			   |
+|			[child1_pid]   	        				[child2_pid]			   |
+|    	    		|                   	           |					   |
+|	  ------------------------	     			---------------------		   |
+|	  |          	         |	         		|                   |		   |
+|	Child 1           		Parent	     	Child 2            Parent		   |
+| (exec cmd1)     		 after fork1  	   (exec cmd2)       after fork2	   |
+| 	  |                  	 |     		    	|                    |		   |
+|	  |                   	 |         			|                    |		   |
+|	┌--------------- --─┐    |   	  	┌----------------────┐   	 |		   |
+|	│ close(pipe_fd[0]) │  	 |     		│ close(pipe_fd[1])  │	     |		   |
+|	│ dup2(infile, 0)   │  	 |	     	│ dup2(pipe_fd[0], 0)│   	 |		   |
+|	│ dup2(pipe_fd[1],1)│ 	 | 	    	│ dup2(outfile, 1)   │   	 |	       |
+|	│   {exe_cmd1}      |    |          |   {exe_cmd2}       |       |		   |
+|	|execve(grep hello) │  	 |     		│ execve(wc -l)      │   	 |		   |
+|	└-----------------──┘  	 |    		└----------------────┘   	 |		   |
+|    	                  	 |                              		 |		   |
+|							{main}									 |	       |
+|					 Parent closes both ends of pipe                 |		   |
+|            	     waitpid(child1_pid)                             |		   |
+|                	 waitpid(child2_pid)							 |		   |
+|                	 wifexited() //macros                            |		   |
+-------------------------------------------------------------------------------|
+
+					a liner structure of how the pipe work
+--------------------------------------------------------------------------------
+|			fd0			fd1	     /-------/\		fd0			  fd1			   |
+| infile  ----->  cmd1  ----->  |  pipe |  |  ----->   cmd2  ------>   outfile |
+|       (infile_fd)   pipefd[1]  \ _____ \ / (pipefd[0])  (outfile_fd)   	   |
+|                     write_side		      read_side                        |
+|                             \             / 							   	   |
+|                              \ pipefd[2] /							       |
+|                               /      |     \		   					  	   |
+|                         first_fork   |  	second_fork					       |
+|                           (cmd1)     |      (cmd2)				           |
+|                         (child 1)    |    (child 2) 					       |
+--------------------------------------------------------------------------------
+
 ---------------------new variable types used here--------------------------------
 - pid_t is a data type used in POSIX systems (like Linux and macOS) to represent process IDs. 
     - pid_t is a typedef (an alias) for some integer type, usually a signed integer like int.
