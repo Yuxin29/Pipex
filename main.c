@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/21 15:25:53 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/22 17:25:42 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,12 +18,14 @@ fd_tables:
 2  → terminal error		(stderr)
 
 dup2()
-it creates a copy of the file descriptor oldfd, using the file descriptor number specified in newfd.  
-If the file descriptor newfd was previously open, it is silently closed before being reused.
-The  steps  of  closing  and reusing the file descriptor newfd are performed atomically.  
-    * If oldfd is not a valid file descriptor, then the call fails, and newfd is not closed.
-    * If oldfd is a valid file descriptor, and newfd has the same value as oldfd, then dup2() does nothing, and returns newfd.
-
+it creates a copy of the file descriptor 
+oldfd, using the file descriptor number specified in newfd.  
+If the file descriptor newfd was previously open, 
+it is silently closed before being reused.
+* If oldfd is not valid, then the call fails, and newfd is not closed.
+* If oldfd is valid, and newfd has the same value as oldfd,
+  then dup2() does nothing, and returns newfd.
+PRPTOTYPE
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
 --------------------------------------------------------------------------------
@@ -62,7 +64,7 @@ int dup2(int oldfd, int newfd);
 
 					a liner structure of how the pipe work
 --------------------------------------------------------------------------------
-|			fd0			 fd1    /-------/\		fd0			  fd1			   |
+|			fd0			 fd1     /-------/\		fd0			  fd1			   |
 | infile  ----->  cmd1  ----->  |  pipe |  |  ----->   cmd2  ------>   outfile |
 |       (infile_fd)   pipefd[1]  \ _____ \/ (pipefd[0])  (outfile_fd)   	   |
 |                     write_side		      read_side                        |
@@ -76,13 +78,13 @@ int dup2(int oldfd, int newfd);
 |						 / 	    \		   /		 \						   |
 |						/	     |		  |			  \ 					   |
 |					   /         |        |            |                       |
-|dup2(infile_fd, STDIN_FILENO) dup2(pipefd[1], STDOUT_FILENO)                  |
+|			dup2(infile_fd, 0) dup2(pipefd[1], 1)      |
 |(Redirect stdin to infile_fd) (Redirect stdout to pipe write)    			   |
 |							              |            |					   |
 |										 /             |					   |
 |										/			   |					   |
-|                dup2(pipefd[0], STDIN_FILENO)  dup2(outfile_fd, STDOUT_FILENO)|
-|                (Redirect stdin to pipe read)  (Redirect stdout to outfile)   |
+|               	    dup2(pipefd[0], 0)  	dup2(outfile_fd, 1)			   |
+|            (Redirect stdin to pipe read)  	(Redirect stdout to outfile)   |
 --------------------------------------------------------------------------------
 
 */
@@ -94,7 +96,8 @@ int dup2(int oldfd, int newfd);
 // pipe write → stdout
 // close read end of the pipe (not needed in cmd1)
 // close write end of the pipe (handled by dup2)
-static void	first_fork(int infile_fd, int pipefd[2], char *av2, char **envp)
+
+static pid_t	fork_1(int infile_fd, int pipefd[2], char *av2, char **envp)
 {
 	pid_t	fk1;
 
@@ -103,12 +106,18 @@ static void	first_fork(int infile_fd, int pipefd[2], char *av2, char **envp)
 		ft_error("Error fork");
 	if (fk1 == 0)
 	{
-		dup2(infile_fd, STDIN_FILENO);
-		dup2(pipefd[1], STDOUT_FILENO);
+		// Only redirect stdin if input file exists
+		if (infile_fd >= 0)
+		{
+			dup2(infile_fd, 0);
+			close(infile_fd);
+		}
+		dup2(pipefd[1], 1);
 		close(pipefd[0]);
 		close(pipefd[1]);
-		exe_cmd(infile_fd, av2, pipefd[1], envp);
+		exe_cmd(av2, envp);
 	}
+	return (fk1);
 }
 
 // In child2: wc -l
@@ -116,7 +125,7 @@ static void	first_fork(int infile_fd, int pipefd[2], char *av2, char **envp)
 // outfile → stdout
 // close write end of the pipe (not needed in cmd2)
 // close read end of the pipe (handled by dup2)
-static void	second_fork(int outfile_fd, int pipefd[2], char *av3, char **envp)
+static pid_t	fork_2(int outfile_fd, int pipefd[2], char *av3, char **envp)
 {
 	pid_t	fk2;
 
@@ -125,12 +134,26 @@ static void	second_fork(int outfile_fd, int pipefd[2], char *av3, char **envp)
 		ft_error("Error fork");
 	if (fk2 == 0)
 	{
-		dup2(pipefd[0], STDIN_FILENO);
-		dup2(outfile_fd, STDOUT_FILENO);
+		dup2(pipefd[0], 0);
+		dup2(outfile_fd, 1);
 		close(pipefd[1]);
 		close(pipefd[0]);
-		exe_cmd(pipefd[0], av3, outfile_fd, envp);
+		exe_cmd(av3, envp);
 	}
+	return (fk2);
+}
+
+static int	handle_exit_status(int status1, int status2)
+{
+	if (WIFEXITED(status2)) //Return the status of the last command (like shell does)
+		return (WEXITSTATUS(status2));
+	else if (WIFSIGNALED(status2))
+		return (128 + WTERMSIG(status2));
+	if (WIFEXITED(status1)) // If second command didn't exit normally, check first command
+		return (WEXITSTATUS(status1));
+	else if (WIFSIGNALED(status1))
+		return (128 + WTERMSIG(status1));
+	return (0); // Default success if both commands succeeded
 }
 
 //main process, excution function
@@ -145,41 +168,31 @@ int	main(int ac, char **av, char **envp)
 	int		infile_fd;
 	int		outfile_fd;
 	int		pipefd[2];
+	pid_t	pid1;
+	pid_t	pid2;
+	int		status1;
+	int		status2;
 
 	if (ac != 5)
-		return (write(2, "Usage: ./pipex infile cmd1 cmd2 outfile\n", 40), 1);
-	infile_fd = open_infile((const char *)av[1]);
-	if (infile_fd < 0)
-		return (1);
-	outfile_fd = open_outfile((const char *)av[4]);
+		return (write(2, "Usage: ./pipex infile cmd1 cmd2 outfile\n", 39), 1);
+	outfile_fd = open_outfile(av[4]);
 	if (outfile_fd < 0)
-		return (close(infile_fd), 1);
+		return (1);
+	infile_fd = open_infile(av[1]);// May fail, that's okay
 	if (pipe(pipefd) == -1)
 	{
-		close(infile_fd);
-		close(outfile_fd);
+		if (infile_fd >= 0)
+		{
+			close(infile_fd);
+			close(outfile_fd);
+		}
 		ft_error("pipe failed");
 	}
-	first_fork(infile_fd, pipefd, av[2], envp);
-	second_fork(outfile_fd, pipefd, av[3], envp);
-	close_all_four(infile_fd, outfile_fd, pipefd);
-	wait(NULL);
-	wait(NULL);
-	return (0);
-}
-
-//send error msg and exit
-void	ft_error(char *error_msg)
-{
-	perror(error_msg);
-	exit(EXIT_FAILURE);
-}
-
-//close fds and pipefd
-void	close_all_four(int fd1, int fd2, int ppfd[2])
-{
-	close(fd1);
-	close(fd2);
-	close(ppfd[0]);
-	close(ppfd[1]);
+	pid1 = fork_1(infile_fd, pipefd, av[2], envp);
+	pid2 = fork_2(outfile_fd, pipefd, av[3], envp);
+	if (infile_fd >= 0) // Close all file descriptors
+		close_all_four(infile_fd, outfile_fd, pipefd);
+	waitpid(pid1, &status1, 0); // Wait for both processes and capture status
+	waitpid(pid2, &status2, 0);
+	return (handle_exit_status(status1, status2));
 }

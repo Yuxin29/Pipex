@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:44:35 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/19 19:45:04 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/22 19:03:13 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,7 @@ Tries to open or create the output file in write mode.
 On success: returns the file descriptor.
 On failure: prints an error and exits. 
 
-An exit code of 0 indicates success while a non-zero exit code indicates failure. 
+An exit code of 0 indicates success, a non-zero exit code indicates failure. 
 The following failure codes can be returned:
     1   Error in command line syntax.
     2   One of the files passed on the command line did not exist.
@@ -30,37 +30,50 @@ The following failure codes can be returned:
 Questions: are only negative nbrs treated as error and the rest as success
  
 exit: cause the shell to exit-------------exit [n]
-
-    */
+*/
 
 #include "pipex.h"
 
-int open_infile(const char *filename)
+int	open_infile(const char *filename)
 {
-    int fd;
+	int	fd;
 
-    fd = open(filename, 0_RDONLY);
-    if (fd != 0)
-    {
-        //return (ERROR);
-        perror("Error openning infile");
-        exit(EXIT_FAILURE);
-    }
-    return (fd);
+	if (!filename)
+		return (-1);
+	fd = open(filename, O_RDONLY);
+	if (fd < 0)
+		return (-1);
+	return (fd);
 }
 
-int open_outfile(const char *filename)
+//If it doesn’t exist, create it with correct permissions (e.g., 0644).
+//If the file exists, truncate it (overwrite).
+int	open_outfile(const char *filename)
 {
-    int fd;
+	int	fd;
 
-    //If it doesn’t exist, create it with correct permissions (e.g., 0644).
-    //If the file exists, truncate it (overwrite).
-    fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (fd != 0)
-    {
-        //return (ERROR);
-        perror("Error openning infile");
-        exit(EXIT_FAILURE);
-    }
-    return (fd);
+	if (!filename)
+		return (-1);
+	fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fd < 0)
+		return (-1);
+	return (fd);
+}
+
+//send error msg and exit
+void	ft_error(char *error_msg)
+{
+	write(2, "pipex: ", 7);
+	write(2, error_msg, ft_strlen(error_msg));
+	write(2, "\n", 1);
+	exit(EXIT_FAILURE);
+}
+
+//close fds and pipefd
+void	close_all_four(int fd1, int fd2, int ppfd[2])
+{
+	close(fd1);
+	close(fd2);
+	close(ppfd[0]);
+	close(ppfd[1]);
 }

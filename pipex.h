@@ -5,46 +5,40 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/06/19 17:27:50 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/19 17:28:23 by yuwu             ###   ########.fr       */
+/*   Created: 2025/06/22 15:17:44 by yuwu              #+#    #+#             */
+/*   Updated: 2025/06/22 15:18:22 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
-/*
-----------------------examples of how pipe works-------------------------------
-./pipex infile "grep hello" "wc -l" outfile
-- pipex: program name (av[0])
-- infile: read the inout file
-- "grep hello": find lines with hello inside
-- wc: word count
-- outfile: printf how many hello lines r there
-
--------------------------------------
-for the cmd: I dont need to hard code it, they are ready from shell
--------------------------------------
-
-*/
 
 #ifndef PIPEX_H
 # define PIPEX_H
 
-# include<unistd.h>  //write, open, access, dup, dup2, execve, fork, pipe
-# include<stdlib.h>  //malloc, free, exit
-# include<fcntl.h>  //open
-# include<stdio.h>  //write, perror
-# include<string.h> //strerror
+# include <unistd.h>  //write, open, access, dup, dup2, execve, fork, pipe
+# include <stdlib.h>  //malloc, free, exit
+# include <fcntl.h>  //open
+# include <stdio.h>  //write, perror
+# include <string.h> //strerror
+# include <errno.h> //errno?
+# include <sys/wait.h> //wait, waitpid, ??fork as well??
+# include "./libft/libft.h"
 
-//io.c: input and output
-int open_infile(const char *filename);
-int open_outfile(const char *filename);
+//io.c
+//get input and output fds
+//Error exit and closeup fds
+int		open_infile(const char *filename);
+int		open_outfile(const char *filename);
+void	ft_error(char *error_msg);
+void	close_all_four(int fd1, int fd2, int ppfd[2]);
 
-//cmd.c get and execute cmds
-char **make_cmd_array(char *command_str);   //find the command
-char *find_command_in_path(char *cmd, char *path); //find the path
-void exe_cmd(input, cmd, output);   //execute the cmd from the path
+//cmd.c 
+//find paths from envoronments, find cmd in paths, and execute cmds
+char	*find_path_in_envp(char **envp);
+char	*find_command_in_path(char *cmd, char **envp);
+void	exe_cmd(char *command_str, char **envp);
 
-//main.c: main process, excution function
-char *find_path_in_envp(char **envp); //find the environmental pointer
-int main(int ac, char **av, char **envp);
+//main.c
+//main process, excution function: building pipe, call fk and clean up;
+// 2 static fork ft and 1 static exit_checker inside here.
+int		main(int ac, char **av, char **envp);
 
 #endif
