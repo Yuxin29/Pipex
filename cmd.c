@@ -54,13 +54,10 @@ char	*find_command_in_path(char *cmd, char **envp)
 
 	path = find_path_in_envp(envp);
 	if (!path)
-		return (write(2, "pipex: no PATH variable found in environment\n", 43), NULL);
+		return (write(2, "pipex: no PATH found in environment\n", 34), NULL);
 	paths = ft_split(path, ':');
 	if (!paths)
-	{
-		write(2, "pipex: error splitting PATH\n", 27);
-		exit(1);
-	}
+		return (write(2, "pipex: error splitting PATH\n", 28), exit(1), NULL);
 	i = 0;
 	while (paths[i])
 	{
@@ -97,13 +94,10 @@ void	exe_cmd(char *command_str, char **envp)
 	if (ft_strchr(cmd_line[0], '/')) // Handle absolute/relative paths
 	{
 		if (access(cmd_line[0], X_OK) == 0)
-		{
 			execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
-			perror("pipex");
-			ft_free_split(cmd_line);
-			exit(126); // Permission denied
-		}
-		exit_command_not_found(cmd_line);
+		perror("pipex");
+		ft_free_split(cmd_line);
+		exit(126); // Permission denied
 	}
 	cmd_path = find_command_in_path(cmd_line[0], envp);
 	if (!cmd_path)

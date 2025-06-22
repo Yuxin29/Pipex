@@ -96,7 +96,6 @@ int dup2(int oldfd, int newfd);
 // pipe write → stdout
 // close read end of the pipe (not needed in cmd1)
 // close write end of the pipe (handled by dup2)
-
 static pid_t	fork_1(int infile_fd, int pipefd[2], char *av2, char **envp)
 {
 	pid_t	fk1;
@@ -106,8 +105,7 @@ static pid_t	fork_1(int infile_fd, int pipefd[2], char *av2, char **envp)
 		ft_error("Error fork");
 	if (fk1 == 0)
 	{
-		// Only redirect stdin if input file exists
-		if (infile_fd >= 0)
+		if (infile_fd >= 0) // Only redirect stdin if input file exists
 		{
 			dup2(infile_fd, 0);
 			close(infile_fd);
@@ -145,17 +143,59 @@ static pid_t	fork_2(int outfile_fd, int pipefd[2], char *av3, char **envp)
 
 static int	handle_exit_status(int status1, int status2)
 {
-	if (WIFEXITED(status2)) //Return the status of the last command (like shell does)
+	if (WIFEXITED(status2)) //Return the status of the last command
 		return (WEXITSTATUS(status2));
 	else if (WIFSIGNALED(status2))
 		return (128 + WTERMSIG(status2));
-	if (WIFEXITED(status1)) // If second command didn't exit normally, check first command
+	if (WIFEXITED(status1)) // If 2nd cmd didn't exit normally, check the 1st
 		return (WEXITSTATUS(status1));
 	else if (WIFSIGNALED(status1))
 		return (128 + WTERMSIG(status1));
 	return (0); // Default success if both commands succeeded
 }
 
+static void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
+{
+	int		pipefd[2];
+	int		infile_fd;
+	int		outfile_fd;
+	pid_t	pid1;
+	pid_t	pid2;
+
+	outfile_fd = open_outfile(av[4]);
+	if (outfile_fd < 0)
+		exit(1);
+	infile_fd = open_infile(av[1]);
+	if (infile_fd < 0)
+	{
+		close(outfile_fd);
+		exit(1);
+	}
+	if (pipe(pipefd) == -1)
+	{
+		close(infile_fd);
+		close(outfile_fd);
+		ft_error("pipe failed");
+	}
+	pid1 = fork_1(infile_fd, pipefd, av[2], envp);
+	pid2 = fork_2(outfile_fd, pipefd, av[3], envp);
+	close_all_four(infile_fd, outfile_fd, pipefd);
+	waitpid(pid1, status1, 0);
+	waitpid(pid2, status2, 0);
+}
+
+int	main(int ac, char **av, char **envp)
+{
+	int	status1;
+	int	status2;
+
+	if (ac != 5)
+		return (write(2, "Usage: ./pipex infile cmd1 cmd2 outfile\n", 39), 1);
+	execute_pipeline(av, envp, &status1, &status2);
+	return (handle_exit_status(status1, status2));
+}
+
+/*
 //main process, excution function
 //esim      ./pipex infile "grep hello" "wc -l" outfile
 // - Check argument count;
@@ -179,13 +219,12 @@ int	main(int ac, char **av, char **envp)
 	if (outfile_fd < 0)
 		return (1);
 	infile_fd = open_infile(av[1]);// May fail, that's okay
+	if (infile_fd < 0)
+		return (close(outfile_fd), 1);
 	if (pipe(pipefd) == -1)
 	{
-		if (infile_fd >= 0)
-		{
-			close(infile_fd);
-			close(outfile_fd);
-		}
+		close(infile_fd);
+		close(outfile_fd);
 		ft_error("pipe failed");
 	}
 	pid1 = fork_1(infile_fd, pipefd, av[2], envp);
@@ -196,3 +235,4 @@ int	main(int ac, char **av, char **envp)
 	waitpid(pid2, &status2, 0);
 	return (handle_exit_status(status1, status2));
 }
+*/
