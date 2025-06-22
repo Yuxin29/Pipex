@@ -87,17 +87,17 @@ void	exe_cmd(char *command_str, char **envp)
 	char	*cmd_path;
 
 	if (!command_str || !*command_str)
-		exit(126); // Permission denied
+		exit(126);
 	cmd_line = ft_split(command_str, ' ');
 	if (!cmd_line || !cmd_line[0])
-		exit(127); // Command not found
-	if (ft_strchr(cmd_line[0], '/')) // Handle absolute/relative paths
+		exit(127);
+	if (ft_strchr(cmd_line[0], '/'))
 	{
 		if (access(cmd_line[0], X_OK) == 0)
-			execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
+			execve(cmd_line[0], cmd_line, envp);
 		perror("pipex");
 		ft_free_split(cmd_line);
-		exit(126); // Permission denied
+		exit(126);
 	}
 	cmd_path = find_command_in_path(cmd_line[0], envp);
 	if (!cmd_path)
@@ -108,3 +108,10 @@ void	exe_cmd(char *command_str, char **envp)
 	ft_free_split(cmd_line);
 	exit(126);
 }
+
+/*
+	execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
+	
+	exit(127); // Command not found
+	exit(126); // Permission denied
+*/

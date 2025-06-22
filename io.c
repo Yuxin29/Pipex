@@ -34,27 +34,29 @@ exit: cause the shell to exit-------------exit [n]
 
 #include "pipex.h"
 
-int	open_infile(const char *filename)
+int	handle_exit_status(int status1, int status2)
 {
-	int	fd;
-
-	if (!filename)
-		return (-1);
-	fd = open(filename, O_RDONLY);
-	if (fd < 0)
-		return (-1);
-	return (fd);
+	if (WIFEXITED(status2))
+		return (WEXITSTATUS(status2));
+	else if (WIFSIGNALED(status2))
+		return (128 + WTERMSIG(status2));
+	if (WIFEXITED(status1))
+		return (WEXITSTATUS(status1));
+	else if (WIFSIGNALED(status1))
+		return (128 + WTERMSIG(status1));
+	return (0);
 }
 
-//If it doesn’t exist, create it with correct permissions (e.g., 0644).
-//If the file exists, truncate it (overwrite).
-int	open_outfile(const char *filename)
+int	open_file(const char *filename, int is_output)
 {
 	int	fd;
 
 	if (!filename)
 		return (-1);
-	fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (is_output)
+		fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	else
+		fd = open(filename, O_RDONLY);
 	if (fd < 0)
 		return (-1);
 	return (fd);

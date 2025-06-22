@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/22 15:17:44 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/22 15:18:22 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/22 22:03:12 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,8 +25,8 @@
 //io.c
 //get input and output fds
 //Error exit and closeup fds
-int		open_infile(const char *filename);
-int		open_outfile(const char *filename);
+int		handle_exit_status(int status1, int status2);
+int		open_file(const char *filename, int is_output);
 void	ft_error(char *error_msg);
 void	close_all_four(int fd1, int fd2, int ppfd[2]);
 
@@ -38,7 +38,7 @@ void	exe_cmd(char *command_str, char **envp);
 
 //main.c
 //main process, excution function: building pipe, call fk and clean up;
-// 2 static fork ft and 1 static exit_checker inside here.
+// 2 static fork ft and 1 static pipelien and 1 statuc ini io inside here.
 int		main(int ac, char **av, char **envp);
 
 #endif
