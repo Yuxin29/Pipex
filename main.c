@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/22 17:25:42 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/23 20:26:21 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -70,10 +70,10 @@ int dup2(int oldfd, int newfd);
 |                     write_side		      read_side                        |
 |                             \             / 							   	   |
 |                              \ pipefd[2] /							       |
-|                               /      |     \		   					  	   |
-|                         first_fork   |  	second_fork					       |
-|                           (cmd1)     |      (cmd2)				           |
-|                         (child 1)    |    (child 2) 					       |
+|                               /           \		   					  	   |
+|                         first_fork     	second_fork					       |
+|                           (cmd1)           (cmd2)				   		       |
+|                         (child 1)        (child 2) 					       |
 |						  /    |			|		\						   |
 |						 / 	    \		   /		 \						   |
 |						/	     |		  |			  \ 					   |
@@ -87,97 +87,127 @@ int dup2(int oldfd, int newfd);
 |            (Redirect stdin to pipe read)  	(Redirect stdout to outfile)   |
 --------------------------------------------------------------------------------
 
+execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
+
+exit(127); // Command not found
+exit(126); // Permission denied
+126	A file to be executed was found, but it was not an executable utility.
+127	A utility to be executed was not found.
+    >128	A command was interrupted by a signal.
+
 */
 
 #include "pipex.h"
 
+/*
 // In child1: grep hello
 // infile → stdin
 // pipe write → stdout
 // close read end of the pipe (not needed in cmd1)
 // close write end of the pipe (handled by dup2)
-static pid_t	fork_1(int infile_fd, int pipefd[2], char *av2, char **envp)
+*/
+pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 {
-	pid_t	fk1;
+	pid_t	pid;
 
-	fk1 = fork();
-	if (fk1 == -1)
-		ft_error("Error fork");
-	if (fk1 == 0)
+	pid = fork();
+	if (pid == -1)
 	{
-		if (infile_fd >= 0)
+		perror("fork");
+		exit(EXIT_FAILURE);
+	}
+	if (pid == 0)
+	{
+		if (dup2(input_fd, STDIN_FILENO) == -1)
 		{
-			dup2(infile_fd, 0);
-			close(infile_fd);
+			perror("dup2 input");
+			exit (EXIT_FAILURE);
 		}
-		dup2(pipefd[1], 1);
-		close(pipefd[0]);
-		close(pipefd[1]);
-		exe_cmd(av2, envp);
+		if (dup2(output_fd, STDOUT_FILENO) == -1)
+		{
+			perror("dup2 output");
+			exit (EXIT_FAILURE);
+		}
+		close(input_fd);
+		close(output_fd);
+		exe_cmd(cmd, envp);
 	}
-	return (fk1);
+	return (pid);
 }
 
-// In child2: wc -l
-// read end → stdin
-// outfile → stdout
-// close write end of the pipe (not needed in cmd2)
-// close read end of the pipe (handled by dup2)
-static pid_t	fork_2(int outfile_fd, int pipefd[2], char *av3, char **envp)
+static int	*init_fds(char **av)
 {
-	pid_t	fk2;
+	int	*fds;
 
-	fk2 = fork();
-	if (fk2 == -1)
-		ft_error("Error fork");
-	if (fk2 == 0)
+	fds = malloc(sizeof(int) * 2);
+	if (!fds)
+		return (0);
+	if (!av[1] || !av[4])
+		exit(1);
+	if (access(av[1], R_OK) != 0)
 	{
-		dup2(pipefd[0], 0);
-		dup2(outfile_fd, 1);
-		close(pipefd[1]);
-		close(pipefd[0]);
-		exe_cmd(av3, envp);
-	}
-	return (fk2);
-}
-
-static void	init_fds(char **av, int *infile_fd, int *outfile_fd)
-{
-	*outfile_fd = open_file(av[4], 1);
-	if (*outfile_fd < 0)
-	{
-		perror("pipex: output file error");
+		perror("pipex: input not readable");
 		exit(1);
 	}
-	*infile_fd = open_file(av[1], 0);
-	if (*infile_fd < 0)
+	fds[0] = open(av[1], O_RDONLY);
+	if (fds[0] < 0)
 	{
 		perror("pipex: input file error");
-		close(*outfile_fd);
+		free (fds);
 		exit(1);
 	}
+	fds[1] = open(av[4], O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fds[1] < 0)
+	{
+		perror("pipex: output file error");
+		close(fds[0]);
+		free (fds);
+		exit(1);
+	}
+	return (fds);
 }
 
 static void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
 {
-	int		infile_fd;
-	int		outfile_fd;
+	int		*fds;
 	int		pipefd[2];
 	pid_t	pid1;
 	pid_t	pid2;
 
-	init_fds(av, &infile_fd, &outfile_fd);
+	fds = init_fds(av);
+	if (!fds)
+		exit(1);
 	if (pipe(pipefd) == -1)
 	{
-		close(infile_fd);
-		close(outfile_fd);
-		ft_error("pipe failed");
+		perror("pipe failed");
+		close(fds[0]);
+		close(fds[1]);
+		free (fds);
+		exit(1);
 	}
-	pid1 = fork_1(infile_fd, pipefd, av[2], envp);
-	pid2 = fork_2(outfile_fd, pipefd, av[3], envp);
-	close_all_four(infile_fd, outfile_fd, pipefd);
+	pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
+	close(pipefd[1]);
+	pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
+	close(pipefd[0]);
+	close(fds[0]);
+	close(fds[1]);
 	waitpid(pid1, status1, 0);
 	waitpid(pid2, status2, 0);
+	free (fds);
+}
+
+//pid_t waitpid(pid_t pid, int *wstatus, int options);
+static int	handle_exit_status(int status1, int status2)
+{
+	if (WIFEXITED(status2))
+		return (WEXITSTATUS(status2));
+	else if (WIFSIGNALED(status2))
+		return (128 + WTERMSIG(status2));
+	if (WIFEXITED(status1))
+		return (WEXITSTATUS(status1));
+	else if (WIFSIGNALED(status1))
+		return (128 + WTERMSIG(status1));
+	return (0);
 }
 
 int	main(int ac, char **av, char **envp)

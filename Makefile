@@ -14,7 +14,7 @@ NAME := pipex
 CFLAGS := -Wall -Wextra -Werror
 CC := cc
 
-SRCS := io.c cmd.c main.c
+SRCS := cmd.c main.c
 OBJS := $(SRCS:%.c=%.o)
 
 LIBFT_PATH := ./libft/

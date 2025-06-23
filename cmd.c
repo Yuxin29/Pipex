@@ -6,25 +6,24 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:46:51 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/22 18:58:21 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/23 20:26:59 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 /* 
--------------------------get and execute cmds-----------------------------
-
+-------------------------get and execute cmds from the envp---------------------
 - perror - print a system error message: void perror(const char *s);
-    HUOM: does the subject have specification of "ERROR MESSAGES"
-HUOM
+  QQQ: does the subject have specification of "ERROR MESSAGES"?
 - for the cmd: I dont need to hard code it, they are ready from shell
 */
 
 #include "pipex.h"
+#include <errno.h>
 
 // Find "PATH=..." from envp
-// this is not a static, it is going to be called in every cmd/
-// skip "PATH=" and return the path string
-//returns a pointer inside envp, not dynamically allocated — no need to free
+// and then skip "PATH=" and return the path string
+// this is not a static, it is going to be called in every cmd
+// returns a pointer inside envp, not dynamically allocated — no need to free
 char	*find_path_in_envp(char **envp)
 {
 	int	i;
@@ -41,7 +40,7 @@ char	*find_path_in_envp(char **envp)
 
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
-				//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
+		//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
 //esim. output	//- "/bin/grep"
 //access(one_path, X_OK) == 0: check executability,  0 is yes
 char	*find_command_in_path(char *cmd, char **envp)
@@ -57,7 +56,7 @@ char	*find_command_in_path(char *cmd, char **envp)
 		return (write(2, "pipex: no PATH found in environment\n", 34), NULL);
 	paths = ft_split(path, ':');
 	if (!paths)
-		return (write(2, "pipex: error splitting PATH\n", 28), exit(1), NULL);
+		return (write(2, "pipex: error splitting PATH\n", 28), NULL);
 	i = 0;
 	while (paths[i])
 	{
@@ -72,46 +71,45 @@ char	*find_command_in_path(char *cmd, char **envp)
 	return (ft_free_split(paths), NULL);
 }
 
-static void	exit_command_not_found(char **cmd_line)
+static void	exe_error(char **str)
 {
-	ft_putstr_fd("pipex: ", 2);
-	ft_putstr_fd(cmd_line[0], 2);
-	ft_putstr_fd(": command not found\n", 2);
-	ft_free_split(cmd_line);
-	exit(127);
+	perror("pipex");
+	ft_free_split(str);
+	if (errno == ENOENT)
+		exit(127);
+	else
+		exit(126);
 }
 
+// execution;
+// exit code involved here.
+// first try yo execute a relative or absolute path
+// Error Management
+// I try to do it so, if there are null in the 2 static above.
+// it only exit from here
 void	exe_cmd(char *command_str, char **envp)
 {
 	char	**cmd_line;
 	char	*cmd_path;
 
 	if (!command_str || !*command_str)
-		exit(126);
+		exit(127);
 	cmd_line = ft_split(command_str, ' ');
-	if (!cmd_line || !cmd_line[0])
+	if (!cmd_line || !cmd_line[0] || !*cmd_line[0])
 		exit(127);
 	if (ft_strchr(cmd_line[0], '/'))
 	{
 		if (access(cmd_line[0], X_OK) == 0)
 			execve(cmd_line[0], cmd_line, envp);
-		perror("pipex");
-		ft_free_split(cmd_line);
-		exit(126);
+		exe_error(cmd_line);
 	}
 	cmd_path = find_command_in_path(cmd_line[0], envp);
 	if (!cmd_path)
-		exit_command_not_found(cmd_line);
+	{
+		ft_putstr_fd("pipex: command not found\n", 2);
+		ft_free_split(cmd_line);
+		exit(127);
+	}
 	execve(cmd_path, cmd_line, envp);
-	perror("pipex");
-	free(cmd_path);
-	ft_free_split(cmd_line);
-	exit(126);
+	exe_error(cmd_line);
 }
-
-/*
-	execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
-	
-	exit(127); // Command not found
-	exit(126); // Permission denied
-*/
