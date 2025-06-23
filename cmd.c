@@ -18,13 +18,12 @@
 */
 
 #include "pipex.h"
-#include <errno.h>
 
 // Find "PATH=..." from envp
 // and then skip "PATH=" and return the path string
 // this is not a static, it is going to be called in every cmd
 // returns a pointer inside envp, not dynamically allocated — no need to free
-char	*find_path_in_envp(char **envp)
+static char	*find_path_in_envp(char **envp)
 {
 	int	i;
 
@@ -43,7 +42,7 @@ char	*find_path_in_envp(char **envp)
 		//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
 //esim. output	//- "/bin/grep"
 //access(one_path, X_OK) == 0: check executability,  0 is yes
-char	*find_command_in_path(char *cmd, char **envp)
+static char	*find_command_in_path(char *cmd, char **envp)
 {
 	char	*path;
 	char	**paths;
@@ -71,16 +70,6 @@ char	*find_command_in_path(char *cmd, char **envp)
 	return (ft_free_split(paths), NULL);
 }
 
-static void	exe_error(char **str)
-{
-	perror("pipex");
-	ft_free_split(str);
-	if (errno == ENOENT)
-		exit(127);
-	else
-		exit(126);
-}
-
 // execution;
 // exit code involved here.
 // first try yo execute a relative or absolute path
@@ -93,23 +82,28 @@ void	exe_cmd(char *command_str, char **envp)
 	char	*cmd_path;
 
 	if (!command_str || !*command_str)
-		exit(127);
+		close_and_error(0, 0, "pipex: command not found\n", 127);
 	cmd_line = ft_split(command_str, ' ');
 	if (!cmd_line || !cmd_line[0] || !*cmd_line[0])
-		exit(127);
+		close_and_error(0, 0, "pipex: command not found\n", 127);
 	if (ft_strchr(cmd_line[0], '/'))
 	{
 		if (access(cmd_line[0], X_OK) == 0)
 			execve(cmd_line[0], cmd_line, envp);
-		exe_error(cmd_line);
+		ft_free_split(cmd_line);
+		if (errno == ENOENT)
+			close_and_error(0, 0, "pipex: command not found\n", 127);
+		close_and_error(0, 0, "pipex: command not found\n", 126);
 	}
 	cmd_path = find_command_in_path(cmd_line[0], envp);
 	if (!cmd_path)
 	{
-		ft_putstr_fd("pipex: command not found\n", 2);
 		ft_free_split(cmd_line);
-		exit(127);
+		close_and_error(0, 0, "pipex: command not found\n", 127);
 	}
 	execve(cmd_path, cmd_line, envp);
-	exe_error(cmd_line);
+	ft_free_split(cmd_line);
+	if (errno == ENOENT)
+		close_and_error(0, 0, "pipex: command not found\n", 127);
+	close_and_error(0, 0, "pipex: command not found\n", 126);
 }

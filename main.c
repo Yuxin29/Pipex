@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/23 20:26:21 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/23 22:26:12 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -99,71 +99,7 @@ exit(126); // Permission denied
 
 #include "pipex.h"
 
-// In child1: grep hello
-// infile → stdin
-// infile → stdout
-pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
-{
-	pid_t	pid;
-
-	pid = fork();
-	if (pid == -1)
-	{
-		perror("fork");
-		exit(1);
-	}
-	if (pid == 0)
-	{
-		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
-		{
-			perror("dup2");
-			close(input_fd);
-			close(output_fd);
-			exit (1);
-		}
-		close(input_fd);
-		close(output_fd);
-		exe_cmd(cmd, envp);
-	}
-	return (pid);
-}
-
-static int	*init_fds(char **av)
-{
-	int	*fds;
-
-	if (!av[1] || !av[4])
-	{
-		perror("pipex: command not found");
-		exit(127);
-	}
-	if (access(av[1], R_OK) != 0)
-	{
-		perror("pipex: input not readable");
-		exit(1);
-	}
-	fds = malloc(sizeof(int) * 2);
-	if (!fds)
-		exit(1);
-	fds[0] = open(av[1], O_RDONLY);
-	if (fds[0] < 0)
-	{
-		perror("pipex: input file error");
-		free (fds);
-		exit(1);
-	}
-	fds[1] = open(av[4], O_CREAT | O_WRONLY | O_TRUNC, 0644);
-	if (fds[1] < 0)
-	{
-		perror("pipex: output file error");
-		close(fds[0]);
-		free (fds);
-		exit(1);
-	}
-	return (fds);
-}
-
-static void	close_all(int	*fds, int ppfd[2])
+void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
 {
 	if (fds)
 	{
@@ -173,13 +109,69 @@ static void	close_all(int	*fds, int ppfd[2])
 			close(fds[1]);
 		free(fds);
 	}
-	if (ppfd[0] >= 0)
-		close(ppfd[0]);
-	if (ppfd[1] >= 0)
-		close(ppfd[1]);
+	if (ppfd)
+	{
+		if (ppfd[0] >= 0)
+			close(ppfd[0]);
+		if (ppfd[1] >= 0)
+			close(ppfd[1]);
+	}
+	if (msg)
+	{
+		if (exit_code == 127 || exit_code == 126)
+			ft_putstr_fd((char *)msg, 2);
+		else
+			perror(msg);
+	}
+	exit(exit_code);
 }
 
-static void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
+// In child1: grep hello
+// infile → stdin
+// infile → stdout
+pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
+{
+	pid_t	pid;
+
+	pid = fork();
+	if (pid == -1)
+		close_and_error(0, 0, "fork", 1);
+	if (pid == 0)
+	{
+		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
+		{
+			close(input_fd);
+			close(output_fd);
+			close_and_error(0, 0, "dup2", 1);
+		}
+		close(input_fd);
+		close(output_fd);
+		exe_cmd(cmd, envp);
+	}
+	return (pid);
+}
+
+int	*init_fds(char **av)
+{
+	int	*fds;
+
+	if (!av[1] || !av[4])
+		close_and_error(0, 0, "pipex: command not found", 127);
+	if (access(av[1], R_OK) != 0)
+		close_and_error(0, 0, "pipex: input not readable", 1);
+	fds = malloc(sizeof(int) * 2);
+	if (!fds)
+		exit(1);
+	fds[0] = open(av[1], O_RDONLY);
+	if (fds[0] < 0)
+		close_and_error(fds, 0, "pipex: input file error", 1);
+	fds[1] = open(av[4], O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if (fds[1] < 0)
+		close_and_error(fds, 0, "pipex: output file error", 1);
+	return (fds);
+}
+
+void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
 {
 	int		*fds;
 	int		pipefd[2];
@@ -188,16 +180,14 @@ static void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
 
 	fds = init_fds(av);
 	if (pipe(pipefd) == -1)
-	{
-		perror("pipe failed");
-		close_all(fds, pipefd);
-		exit(1);
-	}
+		close_and_error(fds, pipefd, "pipe failed", 1);
 	pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	close(pipefd[1]);
 	pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
 	close(pipefd[0]);
-	close_all(fds, pipefd);
+	close(fds[0]);
+	close(fds[1]);
+	free(fds);
 	waitpid(pid1, status1, 0);
 	waitpid(pid2, status2, 0);
 }
