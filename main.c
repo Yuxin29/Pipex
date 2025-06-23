@@ -99,13 +99,9 @@ exit(126); // Permission denied
 
 #include "pipex.h"
 
-/*
 // In child1: grep hello
 // infile → stdin
-// pipe write → stdout
-// close read end of the pipe (not needed in cmd1)
-// close write end of the pipe (handled by dup2)
-*/
+// infile → stdout
 pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 {
 	pid_t	pid;
@@ -114,19 +110,16 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 	if (pid == -1)
 	{
 		perror("fork");
-		exit(EXIT_FAILURE);
+		exit(1);
 	}
 	if (pid == 0)
 	{
-		if (dup2(input_fd, STDIN_FILENO) == -1)
+		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
 		{
-			perror("dup2 input");
-			exit (EXIT_FAILURE);
-		}
-		if (dup2(output_fd, STDOUT_FILENO) == -1)
-		{
-			perror("dup2 output");
-			exit (EXIT_FAILURE);
+			perror("dup2");
+			close(input_fd);
+			close(output_fd);
+			exit (1);
 		}
 		close(input_fd);
 		close(output_fd);
@@ -139,16 +132,19 @@ static int	*init_fds(char **av)
 {
 	int	*fds;
 
-	fds = malloc(sizeof(int) * 2);
-	if (!fds)
-		return (0);
 	if (!av[1] || !av[4])
-		exit(1);
+	{
+		perror("pipex: command not found");
+		exit(127);
+	}
 	if (access(av[1], R_OK) != 0)
 	{
 		perror("pipex: input not readable");
 		exit(1);
 	}
+	fds = malloc(sizeof(int) * 2);
+	if (!fds)
+		exit(1);
 	fds[0] = open(av[1], O_RDONLY);
 	if (fds[0] < 0)
 	{
@@ -167,6 +163,22 @@ static int	*init_fds(char **av)
 	return (fds);
 }
 
+static void	close_all(int	*fds, int ppfd[2])
+{
+	if (fds)
+	{
+		if (fds[0] >= 0)
+			close(fds[0]);
+		if (fds[1] >= 0)
+			close(fds[1]);
+		free(fds);
+	}
+	if (ppfd[0] >= 0)
+		close(ppfd[0]);
+	if (ppfd[1] >= 0)
+		close(ppfd[1]);
+}
+
 static void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
 {
 	int		*fds;
@@ -175,39 +187,19 @@ static void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
 	pid_t	pid2;
 
 	fds = init_fds(av);
-	if (!fds)
-		exit(1);
 	if (pipe(pipefd) == -1)
 	{
 		perror("pipe failed");
-		close(fds[0]);
-		close(fds[1]);
-		free (fds);
+		close_all(fds, pipefd);
 		exit(1);
 	}
 	pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	close(pipefd[1]);
 	pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
 	close(pipefd[0]);
-	close(fds[0]);
-	close(fds[1]);
+	close_all(fds, pipefd);
 	waitpid(pid1, status1, 0);
 	waitpid(pid2, status2, 0);
-	free (fds);
-}
-
-//pid_t waitpid(pid_t pid, int *wstatus, int options);
-static int	handle_exit_status(int status1, int status2)
-{
-	if (WIFEXITED(status2))
-		return (WEXITSTATUS(status2));
-	else if (WIFSIGNALED(status2))
-		return (128 + WTERMSIG(status2));
-	if (WIFEXITED(status1))
-		return (WEXITSTATUS(status1));
-	else if (WIFSIGNALED(status1))
-		return (128 + WTERMSIG(status1));
-	return (0);
 }
 
 int	main(int ac, char **av, char **envp)
@@ -218,5 +210,13 @@ int	main(int ac, char **av, char **envp)
 	if (ac != 5)
 		return (write(2, "Usage: ./pipex infile cmd1 cmd2 outfile\n", 39), 1);
 	execute_pipeline(av, envp, &status1, &status2);
-	return (handle_exit_status(status1, status2));
+	if (WIFEXITED(status2))
+		return (WEXITSTATUS(status2));
+	else if (WIFSIGNALED(status2))
+		return (128 + WTERMSIG(status2));
+	if (WIFEXITED(status1))
+		return (WEXITSTATUS(status1));
+	else if (WIFSIGNALED(status1))
+		return (128 + WTERMSIG(status1));
+	return (0);
 }
