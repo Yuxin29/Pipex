@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:46:51 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/23 20:26:59 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/25 18:00:27 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,39 +71,35 @@ static char	*find_command_in_path(char *cmd, char **envp)
 }
 
 // execution;
-// exit code involved here.
 // first try yo execute a relative or absolute path
-// Error Management
-// I try to do it so, if there are null in the 2 static above.
-// it only exit from here
-void	exe_cmd(char *command_str, char **envp)
+// About Error Management
+// I try to do it so, if there are null in the 2 static above, 
+// it only give error signals here but not exit, pass the error sig int to main
+// because in the main, there might be reacheable mem of fds if exit here
+int	exe_cmd(char *cmd, char **envp)
 {
-	char	**cmd_line;
-	char	*cmd_path;
+	char	**args;
+	char	*path;
 
-	if (!command_str || !*command_str)
-		close_and_error(0, 0, "pipex: command not found\n", 127);
-	cmd_line = ft_split(command_str, ' ');
-	if (!cmd_line || !cmd_line[0] || !*cmd_line[0])
-		close_and_error(0, 0, "pipex: command not found\n", 127);
-	if (ft_strchr(cmd_line[0], '/'))
+	args = ft_split(cmd, ' ');
+	if (!args)
+		return (1);
+	if (ft_strchr(args[0], '/'))
 	{
-		if (access(cmd_line[0], X_OK) == 0)
-			execve(cmd_line[0], cmd_line, envp);
-		ft_free_split(cmd_line);
-		if (errno == ENOENT)
-			close_and_error(0, 0, "pipex: command not found\n", 127);
-		close_and_error(0, 0, "pipex: command not found\n", 126);
+		execve(args[0], args, envp);
+		ft_putstr_fd("pipex: ", 2);
+		perror(args[0]);
+		return (ft_free_split(args), 126);
 	}
-	cmd_path = find_command_in_path(cmd_line[0], envp);
-	if (!cmd_path)
+	path = find_command_in_path(args[0], envp);
+	if (!path)
 	{
-		ft_free_split(cmd_line);
-		close_and_error(0, 0, "pipex: command not found\n", 127);
+		ft_putstr_fd("pipex: command not found: ", 2);
+		ft_putendl_fd(args[0], 2);
+		return (ft_free_split(args), 127);
 	}
-	execve(cmd_path, cmd_line, envp);
-	ft_free_split(cmd_line);
-	if (errno == ENOENT)
-		close_and_error(0, 0, "pipex: command not found\n", 127);
-	close_and_error(0, 0, "pipex: command not found\n", 126);
+	execve(path, args, envp);
+	free(path);
+	ft_free_split(args);
+	return (126);
 }
