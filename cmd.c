@@ -37,7 +37,6 @@ static char	*find_path_in_envp(char **envp)
 	return (NULL);
 }
 
-// Add the check before forking
 int	check_command_existence(char *cmd, char **envp)
 {
 	char	**args;
@@ -48,6 +47,7 @@ int	check_command_existence(char *cmd, char **envp)
 	args = ft_split(cmd, ' ');
 	if (!args)
 		return (1);
+	printf("[DEBUG] Checking command: '%s'\n", args[0]);
 	if (ft_strchr(args[0], '/'))
 	{
 		if (access(args[0], X_OK) == 0)
@@ -82,6 +82,7 @@ char	*find_command_in_path(char *cmd, char **envp)
 	path = find_path_in_envp(envp);
 	if (!path)
 		return (write(2, "pipex: no PATH found in environment\n", 34), NULL);
+	printf("[DEBUG] PATH: %s\n", path);
 	paths = ft_split(path, ':');
 	if (!paths)
 		return (write(2, "pipex: error splitting PATH\n", 28), NULL);
@@ -91,6 +92,7 @@ char	*find_command_in_path(char *cmd, char **envp)
 		temp = ft_strjoin(paths[i], "/");
 		one_path = ft_strjoin(temp, cmd);
 		free(temp);
+		printf("[DEBUG] Checking path: %s\n", one_path);
 		if (access(one_path, X_OK) == 0)
 			return (ft_free_split(paths), one_path);
 		free(one_path);

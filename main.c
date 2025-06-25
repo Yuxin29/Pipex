@@ -135,6 +135,7 @@ int	*init_fds(int	*fds, char **av)
 		if (fds[0] < 0)
 			close_and_error(fds, 0, "Failed to open file", 1);
 	}
+	printf("[DEBUG] Opening output file: %s\n", av[4]);
 	fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fds[1] < 0)
 		close_and_error(fds, 0, "Failed to open out file", 1);
@@ -163,27 +164,21 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 	return (pid);
 }
 
-//error management, it never exits ehre
+//error management,  if not piefail: it never exits ehre
 void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 {
 	int		pipefd[2];
 	pid_t	pid1;
 	pid_t	pid2;
-	int		cmd1_ok;
-	int		cmd2_ok;
 
 	if (!init_fds(fds, av) || pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
-	cmd1_ok = check_command_existence(av[2], envp) == 0;
-	cmd2_ok = check_command_existence(av[3], envp) == 0;
-	if (!cmd1_ok || !cmd2_ok)
-		ft_putendl_fd("pipex: command not found", 2);
-	if (cmd1_ok)
+	if (check_command_existence(av[2], envp) == 0)
 		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	else
 		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
 	close(pipefd[1]);
-	if (cmd2_ok)
+	if (check_command_existence(av[3], envp) == 0)
 		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
 	else
 		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
@@ -192,7 +187,7 @@ void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 	waitpid(pid2, status, 0);
 	close(fds[0]);
 	close(fds[1]);
-	if (!cmd2_ok)
+	if (check_command_existence(av[3], envp) != 0)
 		*status = 127;
 }
 

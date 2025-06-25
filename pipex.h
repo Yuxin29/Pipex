@@ -10,9 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef PIPEX_H
-# define PIPEX_H
-
+/*
 #include <unistd.h> //write, open, access, dup, dup2, execve, fork, pipe
 #include <stdlib.h> //malloc, free, exit
 #include <fcntl.h> //open
@@ -20,6 +18,19 @@
 #include <string.h> //strerror
 # include <errno.h> //errno?
 # include <sys/wait.h> //wait, waitpid, ??fork as well??
+# include "./libft/libft.h"
+*/
+
+#ifndef PIPEX_H
+# define PIPEX_H
+
+# include <unistd.h>
+# include <stdlib.h>
+# include <fcntl.h>
+# include <stdio.h>
+# include <string.h>
+# include <errno.h>
+# include <sys/wait.h>
 # include "./libft/libft.h"
 
 //cmd.c 
@@ -31,7 +42,6 @@ int		exe_cmd(char *command_str, char **envp);
 //main.c
 //main process, excution function: building pipe, call fk and clean up;
 void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
-int		*init_fds(int *fds, char **av);
 pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp);
 void	execute_pipeline(char **av, char **envp, int *status, int *fds);
 int		main(int ac, char **av, char **envp);
