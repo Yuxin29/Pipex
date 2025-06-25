@@ -37,12 +37,41 @@ static char	*find_path_in_envp(char **envp)
 	return (NULL);
 }
 
+// Add the check before forking
+int	check_command_existence(char *cmd, char **envp)
+{
+	char	**args;
+	char	*path;
+	int		ret;
+
+	ret = 1;
+	args = ft_split(cmd, ' ');
+	if (!args)
+		return (1);
+	if (ft_strchr(args[0], '/'))
+	{
+		if (access(args[0], X_OK) == 0)
+			ret = 0;
+	}
+	else
+	{
+		path = find_command_in_path(args[0], envp);
+		if (path)
+		{
+			free(path);
+			ret = 0;
+		}
+	}
+	ft_free_split(args);
+	return (ret);
+}
+
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
 		//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
 //esim. output	//- "/bin/grep"
 //access(one_path, X_OK) == 0: check executability,  0 is yes
-static char	*find_command_in_path(char *cmd, char **envp)
+char	*find_command_in_path(char *cmd, char **envp)
 {
 	char	*path;
 	char	**paths;

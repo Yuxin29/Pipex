@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/25 18:06:50 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/25 22:32:44 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -126,40 +126,8 @@ void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
 	exit(exit_code);
 }
 
-pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp, int *fds)
+int	*init_fds(int	*fds, char **av)
 {
-	pid_t	pid;
-	int		result;
-
-	pid = fork();
-	if (pid == -1)
-		close_and_error(fds, 0, "fork", 1);
-	if (pid == 0)
-	{
-		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
-		{
-			close(input_fd);
-			close(output_fd);
-			close_and_error(fds, 0, "pipex: dup2 failed", 1);
-		}
-		close(input_fd);
-		close(output_fd);
-		result = exe_cmd(cmd, envp);
-		free(fds);
-		exit(result);
-	}
-	close(input_fd);
-	close(output_fd);
-	return (pid);
-}
-
-int	*init_fds(char **av)
-{
-	int	*fds;
-
-	fds = malloc(sizeof(int) * 2);
-	if (!fds)
-		close_and_error(0, 0, "malloc", 1);
 	fds[0] = open(av[1], O_RDONLY);
 	if (fds[0] < 0)
 	{
@@ -173,40 +141,81 @@ int	*init_fds(char **av)
 	return (fds);
 }
 
-void	execute_pipeline(char **av, char **envp, int *status1, int *status2)
+pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 {
-	int		*fds;
+	pid_t	pid;
+	int		result;
+
+	pid = fork();
+	if (pid == -1)
+		close_and_error(0, 0, "fork", 1);
+	if (pid == 0)
+	{
+		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
+			close_and_error(0, 0, "pipex: dup2 failed", 1);
+		close(input_fd);
+		close(output_fd);
+		result = exe_cmd(cmd, envp);
+		exit(result);
+	}
+	close(input_fd);
+	close(output_fd);
+	return (pid);
+}
+
+//error management, it never exits ehre
+void	execute_pipeline(char **av, char **envp, int *status, int *fds)
+{
 	int		pipefd[2];
 	pid_t	pid1;
 	pid_t	pid2;
+	int		cmd1_ok;
+	int		cmd2_ok;
 
-	fds = init_fds(av);
-	if (pipe(pipefd) == -1)
+	if (!init_fds(fds, av) || pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
-	pid1 = ft_fork(fds[0], pipefd[1], av[2], envp, fds);
+	cmd1_ok = check_command_existence(av[2], envp) == 0;
+	cmd2_ok = check_command_existence(av[3], envp) == 0;
+	if (!cmd1_ok || !cmd2_ok)
+		ft_putendl_fd("pipex: command not found", 2);
+	if (cmd1_ok)
+		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
+	else
+		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
 	close(pipefd[1]);
-	pid2 = ft_fork(pipefd[0], fds[1], av[3], envp, fds);
+	if (cmd2_ok)
+		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
+	else
+		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
 	close(pipefd[0]);
-	waitpid(pid1, status1, 0);
-	waitpid(pid2, status2, 0);
-	free(fds);
+	waitpid(pid1, NULL, 0);
+	waitpid(pid2, status, 0);
+	close(fds[0]);
+	close(fds[1]);
+	if (!cmd2_ok)
+		*status = 127;
 }
 
 int	main(int ac, char **av, char **envp)
 {
-	int	status1;
-	int	status2;
+	int	status;
+	int	*fds;
 
+	status = EXIT_FAILURE;
+	fds = malloc(sizeof(int) * 2);
+	if (!fds)
+		close_and_error(fds, 0, "malloc error", 1);
+	fds[0] = -1;
+	fds[1] = -1;
 	if (ac != 5)
-		close_and_error(0, 0, "Usage: ./pipex infile cmd1 cmd2 outfile", 127);
+		close_and_error(fds, 0, "Usage: ./pipex infile cmd1 cmd2 outfile", 127);
 	if (!*av[1] || !*av[2] || !*av[3] || !*av[4])
-		close_and_error(0, 0, "pipex: missing or empty command", 127);
-	execute_pipeline(av, envp, &status1, &status2);
-	if (WIFEXITED(status2))
-		return (WEXITSTATUS(status2));
-	else if (WIFSIGNALED(status2))
-		return (128 + WTERMSIG(status2));
-	if (WIFEXITED(status1))
-		return (WEXITSTATUS(status1));
-	return (EXIT_FAILURE);
+		close_and_error(fds, 0, "pipex: missing or empty command", 127);
+	execute_pipeline(av, envp, &status, fds);
+	free(fds);
+	if (WIFEXITED(status))
+		return (WEXITSTATUS(status));
+	else if (WIFSIGNALED(status))
+		return (128 + WTERMSIG(status));
+	return (status);
 }
