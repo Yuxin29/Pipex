@@ -93,7 +93,7 @@ exit(127); // Command not found
 exit(126); // Permission denied
 126	A file to be executed was found, but it was not an executable utility.
 127	A utility to be executed was not found.
-    >128	A command was interrupted by a signal.
+>128	A command was interrupted by a signal.
 
 */
 
@@ -135,7 +135,6 @@ int	*init_fds(int	*fds, char **av)
 		if (fds[0] < 0)
 			close_and_error(fds, 0, "Failed to open file", 1);
 	}
-	printf("[DEBUG] Opening output file: %s\n", av[4]);
 	fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fds[1] < 0)
 		close_and_error(fds, 0, "Failed to open out file", 1);
@@ -173,12 +172,12 @@ void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 
 	if (!init_fds(fds, av) || pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
-	if (check_command_existence(av[2], envp) == 0)
+	if (check_command_existence(av[2], envp) == 1)
 		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	else
 		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
 	close(pipefd[1]);
-	if (check_command_existence(av[3], envp) == 0)
+	if (check_command_existence(av[3], envp) == 1)
 		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
 	else
 		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
@@ -187,7 +186,7 @@ void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 	waitpid(pid2, status, 0);
 	close(fds[0]);
 	close(fds[1]);
-	if (check_command_existence(av[3], envp) != 0)
+	if (check_command_existence(av[3], envp) == 0)
 		*status = 127;
 }
 
