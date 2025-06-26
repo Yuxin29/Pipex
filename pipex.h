@@ -37,13 +37,14 @@
 //find paths, find cmd, and execute cmds, and return the exit code to main
 //prechecking command existence and return signals of (0/1)
 //cleaning up: close, free, perror and exit with code
-int		exe_cmd(char *command_str, char **envp);
+int	exe_cmd(char *cmd, char **envp);
 int		check_command_existence(char *cmd, char **envp);
 void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
 
 //main.c
 //main process, excution function: building pipe, call fk and clean up;
 pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp);
-void	execute_pipeline(char **av, char **envp, int *status, int *fds);
+void execute_pipeline(char **av, char **envp, int *wait_status, int *fds);
+//void execute_pipeline(char **av, char **envp, int *status, int *fds);
 int		main(int ac, char **av, char **envp);
 #endif

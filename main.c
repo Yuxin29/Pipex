@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/26 13:48:33 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/26 13:54:48 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -98,21 +98,40 @@ exit(1);		//execution error
 #include "pipex.h"
 
 //initiate file descripter.
-//*fds given as 2 int array,
-//malloc in main, so no change to leak here
-int	*init_fds(int	*fds, char **av)
+//fds given as 2 int array, asigned in the function
+//return an in as errir cide
+int	init_fds(int *fds, char **av)
 {
+	int	error;
+
+	error = 0;
 	fds[0] = open(av[1], O_RDONLY);
 	if (fds[0] < 0)
 	{
+		perror("pipex: input file");
 		fds[0] = open("/dev/null", O_RDONLY);
 		if (fds[0] < 0)
-			close_and_error(fds, 0, "Failed to open file", 1);
+			error = 1;
 	}
-	fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
+	{
+		perror("pipex: output file (no permission)");
+		error = 1;
+		fds[1] = open("/dev/null", O_WRONLY);
+	}
+	else
+	{
+		fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fds[1] < 0)
+		{
+			perror("pipex: output file open failed");
+			error = 1;
+			fds[1] = open("/dev/null", O_WRONLY);
+		}
+	}
 	if (fds[1] < 0)
-		close_and_error(fds, 0, "Failed to open out file", 1);
-	return (fds);
+		error = 1;
+	return (error);
 }
 
 //I have one fork only for 2 childen, just adust the av when called 
@@ -136,40 +155,65 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 		result = exe_cmd(cmd, envp);
 		exit(result);
 	}
+	close(input_fd);
+	close(output_fd);
 	return (pid);
 }
 
-//error management
-//first initate fds, exits if fails.
-//then piepe, exits if fails.
-//then 2 fork even one cmd not existing, it still needs to go though the process
-//in fork process, might be exit status1
-//at the end, the existence of cmd2 deciding the exit estatus
-void	execute_pipeline(char **av, char **envp, int *status, int *fds)
+// Otherwise keep the status from the last command
+void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {
-	int		pipefd[2];
-	pid_t	pid1;
-	pid_t	pid2;
+	int     pipefd[2];
+	pid_t   pid1;
+	pid_t   pid2;
+	int     status1;
+	int     file_error;
 
-	init_fds(fds, av);
+	file_error = 0;
+	if (init_fds(fds, av))
+		file_error = 1;
 	if (pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
-	if (check_command_existence(av[2], envp) == 1)
-		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
-	else
-		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
+	if (file_error) 
+	{
+		int input_fd = open("/dev/null", O_RDONLY);
+		if (check_command_existence(av[2], envp) == 1)
+			pid1 = ft_fork(input_fd, pipefd[1], av[2], envp);
+		else
+			pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
+	} 
+	else 
+	{
+		if (check_command_existence(av[2], envp) == 1)
+			pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
+		else
+			pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
+	}
 	close(pipefd[1]);
-	if (check_command_existence(av[3], envp) == 1)
-		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
+	if (file_error) 
+	{
+		int output_fd = open("/dev/null", O_WRONLY);
+		if (check_command_existence(av[3], envp) == 1)
+			pid2 = ft_fork(pipefd[0], output_fd, av[3], envp);
+		else
+			pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
+	} 
 	else
-		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
+	{
+		if (check_command_existence(av[3], envp) == 1)
+			pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
+		else
+			pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
+	}
 	close(pipefd[0]);
-	waitpid(pid1, NULL, 0);
-	waitpid(pid2, status, 0);
+	waitpid(pid1, &status1, 0);
+	waitpid(pid2, wait_status, 0);
 	close(fds[0]);
 	close(fds[1]);
-	if (check_command_existence(av[3], envp) == 0)
-		*status = 127;
+	if (file_error)
+		*wait_status = W_EXITCODE(1, 0);
+	else if (!check_command_existence(av[3], envp))
+		*wait_status = W_EXITCODE(127, 0);
 }
 
 //fds[2] malloced and preset here at beginning and exit ealy here if fails
@@ -179,10 +223,10 @@ void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 //otherwise		raw status
 int	main(int ac, char **av, char **envp)
 {
-	int	status;
 	int	*fds;
+	int	final_exit_code = 1; // what we return from main()
+	int	wait_status;
 
-	status = EXIT_FAILURE;
 	fds = malloc(sizeof(int) * 2);
 	if (!fds)
 		close_and_error(fds, 0, "malloc error", 1);
@@ -192,11 +236,13 @@ int	main(int ac, char **av, char **envp)
 		close_and_error(fds, 0, "Usage: ./pipex infile cmd1 cmd2 outfile", 127);
 	if (!*av[1] || !*av[2] || !*av[3] || !*av[4])
 		close_and_error(fds, 0, "pipex: missing or empty command", 127);
-	execute_pipeline(av, envp, &status, fds);
+	execute_pipeline(av, envp, &wait_status, fds);
 	free(fds);
-	if (WIFEXITED(status))
-		return (WEXITSTATUS(status));
-	else if (WIFSIGNALED(status))
-		return (128 + WTERMSIG(status));
-	return (status);
+	if (WIFEXITED(wait_status))
+		final_exit_code = WEXITSTATUS(wait_status);
+	else if (WIFSIGNALED(wait_status))
+		final_exit_code = 128 + WTERMSIG(wait_status);
+	else
+		final_exit_code = wait_status;
+	return (final_exit_code);
 }
