@@ -148,9 +148,19 @@ int	init_fds(int *fds, char **av)
 			fds[1] = open("/dev/null", O_WRONLY);
 		}
 	}
-	if (fds[1] < 0 || fds[0] < 0 || (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1))
+	if (fds[1] < 0 || fds[0] < 0)
+		return (1);
+	else if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
 		return (1);
 	return (0);
+}
+
+static void	close_all(int	*ppfd, int	*fds)
+{
+	close(ppfd[0]);
+	close(ppfd[1]);
+	close(fds[0]);
+	close(fds[1]);
 }
 
 // Otherwise keep the status from the last command
@@ -169,16 +179,13 @@ void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	else
 		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
-	close(pipefd[1]);
 	if (check_command_existence(av[3], envp))
 		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
 	else
 		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
-	close(pipefd[0]);
 	waitpid(pid1, &status1, 0);
 	waitpid(pid2, wait_status, 0);
-	close(fds[0]);
-	close(fds[1]);
+	close_all(pipefd, fds);
 	if (file_error)
 		*wait_status = W_EXITCODE(1, 0);
 	else if (!check_command_existence(av[3], envp))
