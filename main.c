@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/25 22:32:44 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/26 13:48:33 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -91,41 +91,15 @@ execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
 
 exit(127); // Command not found
 exit(126); // Permission denied
-126	A file to be executed was found, but it was not an executable utility.
-127	A utility to be executed was not found.
->128	A command was interrupted by a signal.
+exit(1);		//execution error
 
 */
 
 #include "pipex.h"
 
-void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
-{
-	if (fds)
-	{
-		if (fds[0] >= 0)
-			close(fds[0]);
-		if (fds[1] >= 0)
-			close(fds[1]);
-		free(fds);
-	}
-	if (ppfd)
-	{
-		if (ppfd[0] >= 0)
-			close(ppfd[0]);
-		if (ppfd[1] >= 0)
-			close(ppfd[1]);
-	}
-	if (msg)
-	{
-		if (exit_code == 127 || exit_code == 126)
-			ft_putstr_fd((char *)msg, 2);
-		else
-			perror(msg);
-	}
-	exit(exit_code);
-}
-
+//initiate file descripter.
+//*fds given as 2 int array,
+//malloc in main, so no change to leak here
 int	*init_fds(int	*fds, char **av)
 {
 	fds[0] = open(av[1], O_RDONLY);
@@ -141,6 +115,10 @@ int	*init_fds(int	*fds, char **av)
 	return (fds);
 }
 
+//I have one fork only for 2 childen, just adust the av when called 
+//On  success, 0 is returned in child, child process is returned in the parent;
+//On failure, -1 is returned, no child process is created
+//exit status 1 possible because fork might fail, be no cmd checking here.
 pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 {
 	pid_t	pid;
@@ -158,19 +136,23 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 		result = exe_cmd(cmd, envp);
 		exit(result);
 	}
-	close(input_fd);
-	close(output_fd);
 	return (pid);
 }
 
-//error management,  if not piefail: it never exits ehre
+//error management
+//first initate fds, exits if fails.
+//then piepe, exits if fails.
+//then 2 fork even one cmd not existing, it still needs to go though the process
+//in fork process, might be exit status1
+//at the end, the existence of cmd2 deciding the exit estatus
 void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 {
 	int		pipefd[2];
 	pid_t	pid1;
 	pid_t	pid2;
 
-	if (!init_fds(fds, av) || pipe(pipefd) == -1)
+	init_fds(fds, av);
+	if (pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
 	if (check_command_existence(av[2], envp) == 1)
 		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
@@ -190,6 +172,11 @@ void	execute_pipeline(char **av, char **envp, int *status, int *fds)
 		*status = 127;
 }
 
+//fds[2] malloced and preset here at beginning and exit ealy here if fails
+//at the end:
+//WIFEXITED		Normal exit			Child's exit() code		Common (0 or 127)
+//WIFSIGNALED	Killed by signal	128 + signal number		Crashes
+//otherwise		raw status
 int	main(int ac, char **av, char **envp)
 {
 	int	status;

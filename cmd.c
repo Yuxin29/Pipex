@@ -35,42 +35,12 @@ static char	*find_path_in_envp(char **envp)
 	return (NULL);
 }
 
-//prechecking cmd existence and return a in as signal
-//1 as existing and 0 as not existing
-int	check_command_existence(char *cmd, char **envp)
-{
-	char	**args;
-	char	*path;
-	int		existence;
-
-	existence = 0;
-	args = ft_split(cmd, ' ');
-	if (!args)
-		return (1);
-	if (ft_strchr(args[0], '/'))
-	{
-		if (access(args[0], X_OK) == 0)
-			existence = 1;
-	}
-	else
-	{
-		path = find_command_in_path(args[0], envp);
-		if (path)
-		{
-			free(path);
-			existence = 1;
-		}
-	}
-	ft_free_split(args);
-	return (existence);
-}
-
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
 		//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
 //esim. output	//- "/bin/grep"
 //access(one_path, X_OK) == 0: check executability,  0 is yes
-char	*find_command_in_path(char *cmd, char **envp)
+static char	*find_command_in_path(char *cmd, char **envp)
 {
 	char	*path;
 	char	**paths;
@@ -102,7 +72,7 @@ char	*find_command_in_path(char *cmd, char **envp)
 // first try to execute a relative or absolute path
 // About Error Management
 // I try to do it so, if there are null in the 2 static above, 
-// it only give error signals here but not exit, pass the error sig int to main
+// it only give error signals here but not exit, pass the exit code to main
 // because in the main, there might be reacheable mem of fds if exit here
 int	exe_cmd(char *cmd, char **envp)
 {
@@ -130,4 +100,62 @@ int	exe_cmd(char *cmd, char **envp)
 	free(path);
 	ft_free_split(args);
 	return (126);
+}
+
+void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
+{
+	if (fds)
+	{
+		if (fds[0] >= 0)
+			close(fds[0]);
+		if (fds[1] >= 0)
+			close(fds[1]);
+		free(fds);
+	}
+	if (ppfd)
+	{
+		if (ppfd[0] >= 0)
+			close(ppfd[0]);
+		if (ppfd[1] >= 0)
+			close(ppfd[1]);
+	}
+	if (msg)
+	{
+		if (exit_code == 127 || exit_code == 126)
+			ft_putstr_fd((char *)msg, 2);
+		else
+			perror(msg);
+	}
+	exit(exit_code);
+}
+
+//this one is going to be called in the main
+//prechecking cmd existence and return a in as signal
+//1 as existing and 0 as not existing
+int	check_command_existence(char *cmd, char **envp)
+{
+	char	**args;
+	char	*path;
+	int		existence;
+
+	existence = 0;
+	args = ft_split(cmd, ' ');
+	if (!args)
+		return (1);
+	if (ft_strchr(args[0], '/'))
+	{
+		if (access(args[0], X_OK) == 0)
+			existence = 1;
+	}
+	else
+	{
+		path = find_command_in_path(args[0], envp);
+		if (path)
+		{
+			free(path);
+			existence = 1;
+		}
+	}
+	ft_free_split(args);
+	return (existence);
 }

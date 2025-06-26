@@ -17,7 +17,7 @@
 #include <stdio.h> //write, perror
 #include <string.h> //strerror
 # include <errno.h> //errno?
-# include <sys/wait.h> //wait, waitpid, ??fork as well??
+# include <sys/wait.h> //WIFEXITED(status)
 # include "./libft/libft.h"
 */
 
@@ -34,14 +34,15 @@
 # include "./libft/libft.h"
 
 //cmd.c 
-//find paths from envoronments, find cmd in paths, and execute cmds
-int		check_command_existence(char *cmd, char **envp);
-char	*find_command_in_path(char *cmd, char **envp);
+//find paths, find cmd, and execute cmds, and return the exit code to main
+//prechecking command existence and return signals of (0/1)
+//cleaning up: close, free, perror and exit with code
 int		exe_cmd(char *command_str, char **envp);
+int		check_command_existence(char *cmd, char **envp);
+void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
 
 //main.c
 //main process, excution function: building pipe, call fk and clean up;
-void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
 pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp);
 void	execute_pipeline(char **av, char **envp, int *status, int *fds);
 int		main(int ac, char **av, char **envp);
