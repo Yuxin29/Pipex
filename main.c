@@ -97,43 +97,6 @@ exit(1);		//execution error
 
 #include "pipex.h"
 
-//initiate file descripter.
-//fds given as 2 int array, asigned in the function
-//return an in as errir cide
-int	init_fds(int *fds, char **av)
-{
-	int	error;
-
-	error = 0;
-	fds[0] = open(av[1], O_RDONLY);
-	if (fds[0] < 0)
-	{
-		perror("pipex: input file");
-		fds[0] = open("/dev/null", O_RDONLY);
-		if (fds[0] < 0)
-			error = 1;
-	}
-	if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
-	{
-		perror("pipex: output file (no permission)");
-		error = 1;
-		fds[1] = open("/dev/null", O_WRONLY);
-	}
-	else
-	{
-		fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-		if (fds[1] < 0)
-		{
-			perror("pipex: output file open failed");
-			error = 1;
-			fds[1] = open("/dev/null", O_WRONLY);
-		}
-	}
-	if (fds[1] < 0)
-		error = 1;
-	return (error);
-}
-
 //I have one fork only for 2 childen, just adust the av when called 
 //On  success, 0 is returned in child, child process is returned in the parent;
 //On failure, -1 is returned, no child process is created
@@ -160,51 +123,57 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 	return (pid);
 }
 
+//initiate file descripter.
+//fds given as 2 int array, asigned in the function
+//return an in as error signal
+int	init_fds(int *fds, char **av)
+{
+	fds[0] = open(av[1], O_RDONLY);
+	if (fds[0] < 0)
+	{
+		perror("pipex: input file");
+		fds[0] = open("/dev/null", O_RDONLY);
+	}
+	if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
+	{
+		perror("pipex: output file (no permission)");
+		fds[1] = open("/dev/null", O_WRONLY);
+	}
+	else
+	{
+		fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fds[1] < 0)
+		{
+			perror("pipex: output file open failed");
+			fds[1] = open("/dev/null", O_WRONLY);
+		}
+	}
+	if (fds[1] < 0 || fds[0] < 0 || (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1))
+		return (1);
+	return (0);
+}
+
 // Otherwise keep the status from the last command
 void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {
-	int     pipefd[2];
+	int		pipefd[2];
 	pid_t	pid1;
 	pid_t	pid2;
 	int		status1;
 	int		file_error;
 
-	file_error = 0;
-	if (init_fds(fds, av))
-		file_error = 1;
+	file_error = init_fds(fds, av);
 	if (pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
-	if (file_error)
-	{
-		int input_fd = open("/dev/null", O_RDONLY);
-		if (check_command_existence(av[2], envp) == 1)
-			pid1 = ft_fork(input_fd, pipefd[1], av[2], envp);
-		else
-			pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
-	} 
-	else 
-	{
-		if (check_command_existence(av[2], envp) == 1)
-			pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
-		else
-			pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
-	}
-	close(pipefd[1]);
-	if (file_error) 
-	{
-		int output_fd = open("/dev/null", O_WRONLY);
-		if (check_command_existence(av[3], envp) == 1)
-			pid2 = ft_fork(pipefd[0], output_fd, av[3], envp);
-		else
-			pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
-	}
+	if (check_command_existence(av[2], envp))
+		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	else
-	{
-		if (check_command_existence(av[3], envp) == 1)
-			pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
-		else
-			pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
-	}
+		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
+	close(pipefd[1]);
+	if (check_command_existence(av[3], envp))
+		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
+	else
+		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
 	close(pipefd[0]);
 	waitpid(pid1, &status1, 0);
 	waitpid(pid2, wait_status, 0);
@@ -224,9 +193,10 @@ void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 int	main(int ac, char **av, char **envp)
 {
 	int	*fds;
-	int	final_exit_code = 1; // what we return from main()
+	int	final_exit_code;
 	int	wait_status;
 
+	final_exit_code = 1;
 	fds = malloc(sizeof(int) * 2);
 	if (!fds)
 		close_and_error(fds, 0, "malloc error", 1);
