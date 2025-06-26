@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:47:21 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/26 13:54:48 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/26 17:11:48 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -161,20 +161,20 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 }
 
 // Otherwise keep the status from the last command
-void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
+void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {
 	int     pipefd[2];
-	pid_t   pid1;
-	pid_t   pid2;
-	int     status1;
-	int     file_error;
+	pid_t	pid1;
+	pid_t	pid2;
+	int		status1;
+	int		file_error;
 
 	file_error = 0;
 	if (init_fds(fds, av))
 		file_error = 1;
 	if (pipe(pipefd) == -1)
 		close_and_error(fds, pipefd, "pipe failed", 127);
-	if (file_error) 
+	if (file_error)
 	{
 		int input_fd = open("/dev/null", O_RDONLY);
 		if (check_command_existence(av[2], envp) == 1)
@@ -197,7 +197,7 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 			pid2 = ft_fork(pipefd[0], output_fd, av[3], envp);
 		else
 			pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
-	} 
+	}
 	else
 	{
 		if (check_command_existence(av[3], envp) == 1)
