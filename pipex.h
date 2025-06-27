@@ -28,8 +28,6 @@
 # include <stdlib.h>
 # include <fcntl.h>
 # include <stdio.h>
-# include <string.h>
-# include <errno.h>
 # include <sys/wait.h>
 # include "./libft/libft.h"
 

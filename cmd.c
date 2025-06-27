@@ -82,8 +82,8 @@ int	exe_cmd(char *cmd_line, char **envp)
 	char	*path;
 
 	args = ft_split(cmd_line, ' ');
-	if (!args)
-		return (1);
+	if (!args || !args[0])
+		return (ft_free_split(args), 1);
 	if (ft_strchr(args[0], '/'))
 	{
 		execve(args[0], args, envp);
@@ -99,6 +99,7 @@ int	exe_cmd(char *cmd_line, char **envp)
 		return (ft_free_split(args), 127);
 	}
 	execve(path, args, envp);
+	perror(args[0]);
 	free(path);
 	ft_free_split(args);
 	return (126);
@@ -137,8 +138,8 @@ int	check_command_existence(char *cmd_line, char **envp)
 
 	existence = 0;
 	args = ft_split(cmd_line, ' ');
-	if (!args)
-		return (1);
+	if (!args || !args[0])
+		return (ft_free_split(args), 1);
 	if (ft_strchr(args[0], '/'))
 	{
 		if (access(args[0], X_OK) == 0)
