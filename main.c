@@ -97,36 +97,10 @@ exit(1);		//execution error
 
 #include "pipex.h"
 
-//I have one fork only for 2 childen, just adust the av when called 
-//On  success, 0 is returned in child, child process is returned in the parent;
-//On failure, -1 is returned, no child process is created
-//exit status 1 possible because fork might fail, be no cmd checking here.
-pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
-{
-	pid_t	pid;
-	int		result;
-
-	pid = fork();
-	if (pid == -1)
-		close_and_error(0, 0, "fork", 1);
-	if (pid == 0)
-	{
-		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
-			close_and_error(0, 0, "pipex: dup2 failed", 1);
-		close(input_fd);
-		close(output_fd);
-		result = exe_cmd(cmd, envp);
-		exit(result);
-	}
-	close(input_fd);
-	close(output_fd);
-	return (pid);
-}
-
 //initiate file descripter.
-//fds given as 2 int array, asigned in the function
+//fds given as 2 int array, malloced in main, so no malloc failuere here
 //return an in as error signal
-int	init_fds(int *fds, char **av)
+static int	init_fds(int *fds, char **av)
 {
 	fds[0] = open(av[1], O_RDONLY);
 	if (fds[0] < 0)
@@ -155,6 +129,32 @@ int	init_fds(int *fds, char **av)
 	return (0);
 }
 
+//I have only one fork for 2 process, just adust the av and fd when called 
+//On  success, 0 is returned in child, child process is returned in the parent;
+//On failure, -1 is returned, no child process is created
+//exit status 1 possible because fork might fail, be no cmd checking here.
+pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
+{
+	pid_t	pid;
+	int		result;
+
+	pid = fork();
+	if (pid == -1)
+		close_and_error(0, 0, "fork", 1);
+	if (pid == 0)
+	{
+		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
+			close_and_error(0, 0, "pipex: dup2 failed", 1);
+		close(input_fd);
+		close(output_fd);
+		result = exe_cmd(cmd, envp);
+		exit(result);
+	}
+	close(input_fd);
+	close(output_fd);
+	return (pid);
+}
+
 static void	close_all(int	*ppfd, int	*fds)
 {
 	close(ppfd[0]);
@@ -163,6 +163,12 @@ static void	close_all(int	*ppfd, int	*fds)
 	close(fds[1]);
 }
 
+// Here I first check initd_fds erros and save it as file error
+// here I first precheck cmd existence
+// if yes I fork it.
+// if not I still go fork a true cmd
+// at the end I firt check init errors
+// and then check 2nd cmd existence,
 // Otherwise keep the status from the last command
 void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {

@@ -37,8 +37,8 @@
 //find paths, find cmd, and execute cmds, and return the exit code to main
 //prechecking command existence and return signals of (0/1)
 //cleaning up: close, free, perror and exit with code
-int		exe_cmd(char *cmd, char **envp);
-int		check_command_existence(char *cmd, char **envp);
+int		exe_cmd(char *cmd_line, char **envp);
+int		check_command_existence(char *cmd_line, char **envp);
 void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
 
 //main.c

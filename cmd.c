@@ -13,8 +13,9 @@
 /* 
 -------------------------get and execute cmds from the envp---------------------
 - perror - print a system error message: void perror(const char *s);
-  QQQ: does the subject have specification of "ERROR MESSAGES"?
 - for the cmd: I dont need to hard code it, they are ready from shell
+------close and free fds & pipefd_send error msg and exit with code-------------
+------------precheck_command_existence and return int as signals----------------
 */
 
 #include "pipex.h"
@@ -42,30 +43,31 @@ static char	*find_path_in_envp(char **envp)
 //access(one_path, X_OK) == 0: check executability,  0 is yes
 static char	*find_command_in_path(char *cmd, char **envp)
 {
-	char	*path;
-	char	**paths;
+	char	*paths;
+	char	**path;
 	char	*temp;
 	char	*one_path;
 	int		i;
 
-	path = find_path_in_envp(envp);
-	if (!path)
-		return (write(2, "pipex: no PATH found in environment\n", 34), NULL);
-	paths = ft_split(path, ':');
+	paths = find_path_in_envp(envp);
 	if (!paths)
+		return (write(2, "pipex: no PATH found in environment\n", 34), NULL);
+	path = ft_split(paths, ':');
+	if (!path)
 		return (write(2, "pipex: error splitting PATH\n", 28), NULL);
 	i = 0;
-	while (paths[i])
+	while (path[i])
 	{
-		temp = ft_strjoin(paths[i], "/");
+		temp = ft_strjoin(path[i], "/");
 		one_path = ft_strjoin(temp, cmd);
 		free(temp);
 		if (access(one_path, X_OK) == 0)
-			return (ft_free_split(paths), one_path);
+			return (ft_free_split(path), one_path);
 		free(one_path);
 		i++;
 	}
-	return (ft_free_split(paths), NULL);
+	ft_free_split(path);
+	return (NULL);
 }
 
 // execution;
@@ -74,12 +76,12 @@ static char	*find_command_in_path(char *cmd, char **envp)
 // I try to do it so, if there are null in the 2 static above, 
 // it only give error signals here but not exit, pass the exit code to main
 // because in the main, there might be reacheable mem of fds if exit here
-int	exe_cmd(char *cmd, char **envp)
+int	exe_cmd(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
 
-	args = ft_split(cmd, ' ');
+	args = ft_split(cmd_line, ' ');
 	if (!args)
 		return (1);
 	if (ft_strchr(args[0], '/'))
@@ -120,26 +122,21 @@ void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
 			close(ppfd[1]);
 	}
 	if (msg)
-	{
-		if (exit_code == 127 || exit_code == 126)
-			ft_putstr_fd((char *)msg, 2);
-		else
-			perror(msg);
-	}
+		perror(msg);
 	exit(exit_code);
 }
 
 //this one is going to be called in the main
 //prechecking cmd existence and return a in as signal
-//1 as existing and 0 as not existing
-int	check_command_existence(char *cmd, char **envp)
+//1 as existing and 0 as non_existing
+int	check_command_existence(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
 	int		existence;
 
 	existence = 0;
-	args = ft_split(cmd, ' ');
+	args = ft_split(cmd_line, ' ');
 	if (!args)
 		return (1);
 	if (ft_strchr(args[0], '/'))
@@ -151,10 +148,8 @@ int	check_command_existence(char *cmd, char **envp)
 	{
 		path = find_command_in_path(args[0], envp);
 		if (path)
-		{
-			free(path);
 			existence = 1;
-		}
+		free(path);
 	}
 	ft_free_split(args);
 	return (existence);
