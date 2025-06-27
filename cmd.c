@@ -36,6 +36,24 @@ static char	*find_path_in_envp(char **envp)
 	return (NULL);
 }
 
+static char	*safe_join(const char *path, const char *cmd)
+{
+	char	*temp;
+	char	*result;
+
+	temp = ft_strjoin(path, "/");
+	if (!temp)
+		return (NULL);
+	result = ft_strjoin(temp, cmd);
+	if (!result)
+	{
+		free(temp);
+		return (NULL);
+	}
+	free(temp);
+	return (result);
+}
+
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
 		//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
@@ -45,7 +63,6 @@ static char	*find_command_in_path(char *cmd, char **envp)
 {
 	char	*paths;
 	char	**path;
-	char	*temp;
 	char	*one_path;
 	int		i;
 
@@ -58,16 +75,15 @@ static char	*find_command_in_path(char *cmd, char **envp)
 	i = 0;
 	while (path[i])
 	{
-		temp = ft_strjoin(path[i], "/");
-		one_path = ft_strjoin(temp, cmd);
-		free(temp);
+		one_path = safe_join(path[i], cmd);
+		if (!one_path)
+			return (ft_free_split(path), NULL);
 		if (access(one_path, X_OK) == 0)
 			return (ft_free_split(path), one_path);
 		free(one_path);
 		i++;
 	}
-	ft_free_split(path);
-	return (NULL);
+	return (ft_free_split(path), NULL);
 }
 
 // execution;
