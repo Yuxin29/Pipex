@@ -104,10 +104,7 @@ static int	init_fds(int *fds, char **av)
 {
 	fds[0] = open(av[1], O_RDONLY);
 	if (fds[0] < 0)
-	{
-		perror("pipex: input file");
 		fds[0] = open("/dev/null", O_RDONLY);
-	}
 	if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
 	{
 		perror("pipex: output file (no permission)");
@@ -117,14 +114,13 @@ static int	init_fds(int *fds, char **av)
 	{
 		fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (fds[1] < 0)
-		{
-			perror("pipex: output file open failed");
 			fds[1] = open("/dev/null", O_WRONLY);
-		}
 	}
-	if (fds[1] < 0 || fds[0] < 0)
-		return (1);
-	else if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
+	if (fds[0] < 0)
+		return (perror("pipex: input file"), 1);
+	if (fds[1] < 0)
+		return (perror("pipex: output file"), 1);
+	if (access(av[4], F_OK) == 0 && access(av[4], W_OK) == -1)
 		return (1);
 	return (0);
 }
