@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/25 19:31:06 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/26 17:11:03 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/28 11:27:14 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,7 +29,15 @@
 # include <fcntl.h>
 # include <stdio.h>
 # include <sys/wait.h>
+# include <errno.h>
 # include "./libft/libft.h"
+
+//helper.c 
+//cleaning up: close, free, perror and exit with code
+void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
+int	send_error_msg(const char *msg);
+void	close_all(int *ppfd, int *fds);
+char	**ft_free_split(char **split);
 
 //cmd.c 
 //find paths, find cmd, and execute cmds, and return the exit code to main
@@ -37,10 +45,11 @@
 //cleaning up: close, free, perror and exit with code
 int		exe_cmd(char *cmd_line, char **envp);
 int		check_command_existence(char *cmd_line, char **envp);
-void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
 
 //main.c
 //main process, excution function: building pipe, call fk and clean up;
+// one static init_fds inside that give fds signals but not exits
+// below are fts that might exit
 pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp);
 void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds);
 int		main(int ac, char **av, char **envp);

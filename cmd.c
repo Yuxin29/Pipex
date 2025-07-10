@@ -6,7 +6,7 @@
 /*   By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/19 19:46:51 by yuwu              #+#    #+#             */
-/*   Updated: 2025/06/25 18:00:27 by yuwu             ###   ########.fr       */
+/*   Updated: 2025/06/28 12:23:03 by yuwu             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,10 +68,10 @@ static char	*find_command_in_path(char *cmd, char **envp)
 
 	paths = find_path_in_envp(envp);
 	if (!paths)
-		return (write(2, "pipex: no PATH found in environment\n", 34), NULL);
+		return (ft_putendl_fd("pipex: command not found", 2), NULL);
 	path = ft_split(paths, ':');
 	if (!path)
-		return (write(2, "pipex: error splitting PATH\n", 28), NULL);
+		return (send_error_msg("pipex: error splitting PATH"), NULL);
 	i = 0;
 	while (path[i])
 	{
@@ -83,7 +83,8 @@ static char	*find_command_in_path(char *cmd, char **envp)
 		free(one_path);
 		i++;
 	}
-	return (ft_free_split(path), NULL);
+	ft_free_split(path);
+	return (NULL);
 }
 
 // execution;
@@ -96,16 +97,23 @@ int	exe_cmd(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
+	int	err;
 
+	if (!cmd_line || !*cmd_line)
+		return (send_error_msg("pipex: command not found"), 127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
-		return (ft_free_split(args), 1);
+		return (ft_free_split(args), ft_putendl_fd("pipex: command not found", 2), 127);
 	if (ft_strchr(args[0], '/'))
 	{
 		execve(args[0], args, envp);
+		err = errno;
 		ft_putstr_fd("pipex: ", 2);
 		perror(args[0]);
-		return (ft_free_split(args), 126);
+		ft_free_split(args);
+		if (errno == ENOENT)
+			return (127);
+		return (126);
 	}
 	path = find_command_in_path(args[0], envp);
 	if (!path)
@@ -115,32 +123,11 @@ int	exe_cmd(char *cmd_line, char **envp)
 		return (ft_free_split(args), 127);
 	}
 	execve(path, args, envp);
+	ft_putstr_fd("pipex: ", 2);
 	perror(args[0]);
 	free(path);
 	ft_free_split(args);
-	return (126);
-}
-
-void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
-{
-	if (fds)
-	{
-		if (fds[0] >= 0)
-			close(fds[0]);
-		if (fds[1] >= 0)
-			close(fds[1]);
-		free(fds);
-	}
-	if (ppfd)
-	{
-		if (ppfd[0] >= 0)
-			close(ppfd[0]);
-		if (ppfd[1] >= 0)
-			close(ppfd[1]);
-	}
-	if (msg)
-		perror(msg);
-	exit(exit_code);
+	return (127);
 }
 
 //this one is going to be called in the main
@@ -152,6 +139,7 @@ int	check_command_existence(char *cmd_line, char **envp)
 	char	*path;
 	int		existence;
 
+	path = NULL;
 	existence = 0;
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
