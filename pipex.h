@@ -34,8 +34,8 @@
 
 //helper.c 
 //cleaning up: close, free, perror and exit with code
-void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code);
-int	send_error_msg(const char *msg);
+void	error_msg(char *str1, char *str2, char *str3);
+void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code);
 void	close_all(int *ppfd, int *fds);
 char	**ft_free_split(char **split);
 

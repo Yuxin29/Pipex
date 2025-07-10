@@ -12,16 +12,17 @@
 
 #include "pipex.h"
 
-int	send_error_msg(const char *msg)
+void	error_msg(char *str1, char *str2, char *str3)
 {
-	if (msg)
-		perror(msg);
-	if (errno == EACCES)
-		ft_putendl_fd("Permission denied", 2);
-	return (1);
+	if (str1)
+		ft_putstr_fd(str1, 2);
+	if (str2)
+		ft_putstr_fd(str2, 2);
+	if (str3)
+		ft_putstr_fd(str3, 2);
 }
 
-void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
+void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code)
 {
 	if (fds)
 	{
@@ -39,7 +40,7 @@ void	close_and_error(int *fds, int ppfd[2], const char *msg, int exit_code)
 			close(ppfd[1]);
 	}
 	if (msg)
-		perror(msg);
+		ft_putstr_fd(msg, 2);
 	exit(exit_code);
 }
 

@@ -27,6 +27,8 @@ static char	*find_path_in_envp(char **envp)
 	int	i;
 
 	i = 0;
+	if (!envp)
+		return (NULL);
 	while (envp[i])
 	{
 		if (ft_strncmp(envp[i], "PATH=", 5) == 0)
@@ -41,22 +43,20 @@ static char	*safe_join(const char *path, const char *cmd)
 	char	*temp;
 	char	*result;
 
+	if (!path || !cmd)
+		return (NULL);
 	temp = ft_strjoin(path, "/");
 	if (!temp)
 		return (NULL);
 	result = ft_strjoin(temp, cmd);
 	if (!result)
-	{
 		free(temp);
-		return (NULL);
-	}
-	free(temp);
 	return (result);
 }
 
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
-		//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
+//- path(could be) = "/usr/local/bin:/usr/bin:/bin"
 //esim. output	//- "/bin/grep"
 //access(one_path, X_OK) == 0: check executability,  0 is yes
 static char	*find_command_in_path(char *cmd, char **envp)
@@ -66,12 +66,14 @@ static char	*find_command_in_path(char *cmd, char **envp)
 	char	*one_path;
 	int		i;
 
+	if (ft_strchr(cmd, '/') && access(cmd, X_OK) == 0)
+		return (ft_strdup(cmd));
 	paths = find_path_in_envp(envp);
 	if (!paths)
-		return (ft_putendl_fd("pipex: command not found", 2), NULL);
+		return (NULL);
 	path = ft_split(paths, ':');
 	if (!path)
-		return (send_error_msg("pipex: error splitting PATH"), NULL);
+		return (NULL);
 	i = 0;
 	while (path[i])
 	{
@@ -83,8 +85,7 @@ static char	*find_command_in_path(char *cmd, char **envp)
 		free(one_path);
 		i++;
 	}
-	ft_free_split(path);
-	return (NULL);
+	return (ft_free_split(path), NULL);
 }
 
 // execution;
@@ -97,37 +98,44 @@ int	exe_cmd(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
-	int	err;
+	int		err;
 
 	if (!cmd_line || !*cmd_line)
-		return (send_error_msg("pipex: command not found"), 127);
+		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
-		return (ft_free_split(args), ft_putendl_fd("pipex: command not found", 2), 127);
+		return (ft_free_split(args), ft_putstr_fd("pipex: command not found\n", 2), 127);
 	if (ft_strchr(args[0], '/'))
 	{
+		if (access(args[0], F_OK) == -1)
+		{
+			ft_free_split(args);
+			return (error_msg("pipex: ", args[0], ": No such file or directory\n"), 127);
+		}
+		if (access(args[0], X_OK) == -1)
+		{
+			ft_free_split(args);
+			return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
+		}
 		execve(args[0], args, envp);
 		err = errno;
-		ft_putstr_fd("pipex: ", 2);
-		perror(args[0]);
 		ft_free_split(args);
-		if (errno == ENOENT)
-			return (127);
-		return (126);
+		if (err == EACCES)
+			return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
+		return (error_msg("pipex: ", args[0], ": execution failed\n"), 1);
 	}
 	path = find_command_in_path(args[0], envp);
 	if (!path)
-	{
-		ft_putstr_fd("pipex: command not found: ", 2);
-		ft_putendl_fd(args[0], 2);
-		return (ft_free_split(args), 127);
-	}
+		return (ft_free_split(args), error_msg("pipex: ", args[0], ": command not found\n"), 127);
 	execve(path, args, envp);
-	ft_putstr_fd("pipex: ", 2);
-	perror(args[0]);
+	err = errno;
 	free(path);
 	ft_free_split(args);
-	return (127);
+	if (err == ENOENT)
+		return (error_msg("pipex: ", args[0], ": command not found\n"), 127);
+	if (err == EACCES)
+		return (error_msg("pipex: ", cmd_line, ": Permission denied\n"), 126);
+	return (error_msg("pipex: ", cmd_line, ": execution failed\n"), 1);
 }
 
 //this one is going to be called in the main
@@ -139,16 +147,18 @@ int	check_command_existence(char *cmd_line, char **envp)
 	char	*path;
 	int		existence;
 
-	path = NULL;
-	existence = 0;
+	if (!cmd_line || !*cmd_line)
+		return (0);
+	while (*cmd_line == ' ' || *cmd_line == '\t')
+		cmd_line++;
+	if (!*cmd_line)
+		return (0);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
-		return (ft_free_split(args), 1);
-	if (ft_strchr(args[0], '/'))
-	{
-		if (access(args[0], X_OK) == 0)
-			existence = 1;
-	}
+		return (ft_free_split(args), 0);
+	existence = 0;
+	if (ft_strchr(args[0], '/') && access(args[0], F_OK) == 0)
+		existence = 1;
 	else
 	{
 		path = find_command_in_path(args[0], envp);

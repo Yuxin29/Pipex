@@ -89,9 +89,14 @@ int dup2(int oldfd, int newfd);
 
 execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
 
-exit(127); // Command not found
-exit(126); // Permission denied
-exit(1);		//execution error
+| Exit Code | Meaning                 |
+| --------- | ----------------------- |
+| `127`     | Command not found       |
+| `126`     | Permission denied       |
+| `1`       | General execution error |
+| `0`       | Successful Execution    |
+| `0`       | Second Command Succeeds:   |
+| `0`       | SFile Operations Succeed:   |
 
 */
 
@@ -108,29 +113,24 @@ static int	init_fds(int *fds, char **av)
 	fds[0] = open(av[1], O_RDONLY);
 	if (fds[0] < 0)
 	{
-		ft_putstr_fd("pipex: ", 2);
-		perror(av[1]);  // Will print: pipex: infile_no_r: Permission denied
+		error_msg("pipex: ", av[1], ": Permission denied\n");
 		fds[0] = open("/dev/null", O_WRONLY);
 	}
 	if (out_no_write)
 	{
-		ft_putstr_fd("pipex: ", 2);
-		ft_putstr_fd(av[4], 2);
-		ft_putendl_fd(": Permission denied", 2);
+		error_msg("pipex: ", av[4], ": Permission denied\n");
 		fds[1] = open("/dev/null", O_WRONLY);
-		return (1);
 	}
 	else
 	{
 		fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (fds[1] < 0)
 		{
-			ft_putstr_fd("pipex: ", 2);
-			perror(av[4]);
+			error_msg("pipex: ", av[4], ": Permission denied\n");
 			fds[1] = open("/dev/null", O_WRONLY);
 		}
 	}
-	if (fds[0] < 0 || fds[1] < 0)
+	if (fds[0] < 0 || fds[1] < 0 || out_no_write)
 		return (1);
 	return (0);
 }
@@ -147,11 +147,19 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 
 	pid = fork();
 	if (pid == -1)
-		close_and_error(0, 0, "fork", 1);
+	{
+		close(input_fd);
+		close(output_fd);
+		close_and_error(0, 0, "pipex: fork failed\n", 1);
+	}
 	if (pid == 0)
 	{
 		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
-			close_and_error(0, 0, "pipex: dup2 failed", 1);
+		{
+            close(input_fd);
+            close(output_fd);
+            close_and_error(0, 0, "pipex: dup2 failed\n", 1);
+        }
 		close(input_fd);
 		close(output_fd);
 		result = exe_cmd(cmd, envp);
@@ -169,49 +177,57 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 // at the end I firt check init errors
 // and then check 2nd cmd existence,
 // Otherwise keep the status from the last command
-void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
+void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {
-	int		pipefd[2];
-	pid_t	pid1;
-	pid_t	pid2;
-	int		status1;
-	int		file_error;
-	int		null_fd;
+	int	pipefd[2];
+	pid_t pid1;
+	pid_t pid2;
+	int status1;
+	int status2;
+	int file_error;
+	int cmd1_not_found = 0;
+	int cmd2_not_found = 0;
 
 	file_error = init_fds(fds, av);
 	if (pipe(pipefd) == -1)
-		close_and_error(fds, pipefd, "pipe failed", 127);
+		close_and_error(fds, 0, "pipex: pipe failed\n", 127);
+
 	if (check_command_existence(av[2], envp))
 		pid1 = ft_fork(fds[0], pipefd[1], av[2], envp);
 	else
 	{
-		ft_putstr_fd("pipex: ", 2);
-		ft_putstr_fd(av[2], 2);
-		ft_putendl_fd(": Command not found", 2);
-		null_fd = open("/dev/null", O_RDONLY);
-		pid1 = ft_fork(null_fd, pipefd[1], "true", envp);
-		if (null_fd != -1)
-			close(null_fd);
+		error_msg("pipex: ", av[2], ": command not found\n");
+		cmd1_not_found = 1;
+		pid1 = ft_fork(open("/dev/null", O_RDONLY), pipefd[1], "true", envp);
 	}
+	close(pipefd[1]);
 	if (check_command_existence(av[3], envp))
 		pid2 = ft_fork(pipefd[0], fds[1], av[3], envp);
 	else
 	{
-		ft_putstr_fd("pipex: ", 2);
-		ft_putstr_fd(av[3], 2);
-		ft_putendl_fd(": Command not found", 2);
-		null_fd = open("/dev/null", O_WRONLY);
-		pid2 = ft_fork(pipefd[0], null_fd, "true", envp);
-		if (null_fd != -1)
-			close(null_fd);
+		error_msg("pipex: ", av[3], ": command not found\n");
+		cmd2_not_found = 1;
+		pid2 = ft_fork(pipefd[0], open("/dev/null", O_WRONLY), "true", envp);
 	}
+	close(pipefd[0]);
 	waitpid(pid1, &status1, 0);
-	waitpid(pid2, wait_status, 0);
-	close_all(pipefd, fds);
+	waitpid(pid2, &status2, 0);
+	//close_all(0, fds);
 	if (file_error)
-		*wait_status = W_EXITCODE(1, 0);
-	else if (!check_command_existence(av[3], envp))
-		*wait_status = W_EXITCODE(127, 0);
+		*wait_status = 1;
+	else if (cmd1_not_found || cmd2_not_found)
+    	*wait_status = 127;
+	//else if (outfile_no_w)
+//    	*wait_status = 1;
+	else if (WIFEXITED(status2) && WEXITSTATUS(status2) == 0)
+    	*wait_status = 0;
+	else if (WIFEXITED(status1))
+		*wait_status = WEXITSTATUS(status1);
+	else
+		*wait_status = 0;
+	close(fds[0]);
+    close(fds[1]);
+	free(fds);
 }
 
 //fds[2] malloced and preset here at beginning and exit ealy here if fails
@@ -222,22 +238,15 @@ void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 int	main(int ac, char **av, char **envp)
 {
 	int	*fds;
-	int	final_exit_code;
 	int	wait_status;
 
-	final_exit_code = 1;
+	if (ac != 5)
+		close_and_error(0, 0, "Usage: ./pipex infile cmd1 cmd2 outfile\n", 1);
 	fds = malloc(sizeof(int) * 2);
 	if (!fds)
-		close_and_error(fds, 0, "malloc error", 1);
+		close_and_error(fds, 0, "malloc error\n", 1);
 	fds[0] = -1;
 	fds[1] = -1;
-	if (ac != 5)
-		close_and_error(fds, 0, "Usage: ./pipex infile cmd1 cmd2 outfile", 127);
 	execute_pipeline(av, envp, &wait_status, fds);
-	free(fds);
-	if (WIFEXITED(wait_status))
-		final_exit_code = WEXITSTATUS(wait_status);
-	else if (WIFSIGNALED(wait_status))
-		final_exit_code = 128 + WTERMSIG(wait_status);
-	return (final_exit_code);
+	exit(wait_status);
 }
