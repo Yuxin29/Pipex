@@ -19,7 +19,24 @@
 */
 
 #include "pipex.h"
-#include <string.h>
+
+// Find "PATH=..." from environmental ptr
+// and then skip "PATH=" and return the path string
+static char	*find_path_in_envp(char **envp)
+{
+	int	i;
+
+	i = 0;
+	if (!envp)
+		return (NULL);
+	while (envp[i])
+	{
+		if (ft_strncmp(envp[i], "PATH=", 5) == 0)
+			return (envp[i] + 5);
+		i++;
+	}
+	return (NULL);
+}
 
 static char	*safe_join(const char *path, const char *cmd)
 {
@@ -38,17 +55,6 @@ static char	*safe_join(const char *path, const char *cmd)
 	return (result);
 }
 
-static int	is_all_whitespace(const char *s)
-{
-	while (*s)
-	{
-		if (*s != ' ' && *s != '\t' && *s != '\n')
-			return (0);
-		s++;
-	}
-	return (1);
-}
-
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
 //- path(could be) = "/usr/local/bin:/usr/bin:/bin"
@@ -56,39 +62,63 @@ static int	is_all_whitespace(const char *s)
 //access(one_path, X_OK) == 0: check executability,  0 is yes
 static char	*find_command_in_path(char *cmd, char **envp)
 {
-	char	*paths = NULL;
-	char	**path = NULL;
+	char	*paths;
+	char	**path;
 	char	*one_path;
-	int		j;
+	int		i;
 
-	j = 0;
-	while (envp[j])
-	{
-		if (strncmp(envp[j], "PATH=", 5) == 0)
-		{
-			paths = envp[j] + 5;
-			break ;
-		}
-		j++;
-	}
+	if (ft_strchr(cmd, '/') && access(cmd, X_OK) == 0)
+		return (ft_strdup(cmd));
+	paths = find_path_in_envp(envp);
 	if (!paths)
 		return (NULL);
 	path = ft_split(paths, ':');
 	if (!path)
 		return (NULL);
-	j = 0;
-	while (path[j])
+	i = 0;
+	while (path[i])
 	{
-		one_path = safe_join(path[j], cmd);
+		one_path = safe_join(path[i], cmd);
 		if (!one_path)
 			return (ft_free_split(path), NULL);
 		if (access(one_path, X_OK) == 0)
 			return (ft_free_split(path), one_path);
 		free(one_path);
-		j++;
+		i++;
 	}
-	ft_free_split(path);
-	return (NULL);
+	return (ft_free_split(path), NULL);
+}
+
+//this one is going to be called in the main
+//prechecking cmd existence and return a in as signal
+//1 as existing and 0 as non_existing
+int	check_command_existence(char *cmd_line, char **envp)
+{
+	char	**args;
+	char	*path;
+
+	while (*cmd_line == ' ' || *cmd_line == '\t')
+		cmd_line++;
+	if (!cmd_line || !*cmd_line)
+		return (127);
+	args = ft_split(cmd_line, ' ');
+	if (!args || !args[0])
+		return (ft_free_split(args), 127);
+	if (ft_strchr(args[0], '/'))
+	{
+		if (access(args[0], X_OK) == 0)
+			return (ft_free_split(args), 1);
+		else if (access(args[0], F_OK) == 0)
+			return (ft_free_split(args), 126);
+	}
+	else
+	{
+		path = find_command_in_path(args[0], envp);
+		if (path)
+			return (ft_free_split(args), free(path), 1);
+		free(path);
+	}
+	return (ft_free_split(args), 127);
 }
 
 // execution;
@@ -102,38 +132,24 @@ int	exe_cmd(char *cmd_line, char **envp)
 	char	**args;
 	char	*path;
 
-	if (!cmd_line || !*cmd_line || is_all_whitespace(cmd_line))
-		return (error_msg("pipex: ", ": ", "command not found\n"), 127);
+	if (!cmd_line || !*cmd_line)
+		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
-	{
-		ft_free_split(args);
-		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
-	}
+		return (ft_free_split(args), ft_putstr_fd("pipex: command not found\n", 2), 127);
 	if (ft_strchr(args[0], '/'))
 		path = ft_strdup(args[0]);
 	else
 		path = find_command_in_path(args[0], envp);
 	if (!path)
 	{
-		error_msg("pipex: ", args[0], ": command not found\n");
-		return (ft_free_split(args), 127);
+		ft_free_split(args);
+		return (error_msg("pipex: ", args[0], ": command not found\n"), 127);
 	}
-	errno = 0;
 	execve(path, args, envp);
-	if (ft_strchr(args[0], '/'))
-		perror(args[0]);
-	else if (errno == ENOENT)
-		error_msg("pipex: ", args[0], ": command not found\n");
-	else if (errno == EACCES)
-		error_msg("pipex: ", args[0], ": Permission denied\n");
-	else
-		error_msg("pipex: ", args[0], ": execution failed\n");
-	ft_free_split(args);
 	free(path);
-	if (errno == ENOENT)
-		return (127);
-	else if (errno == EACCES)
-		return (126);
-	return (1);
+	ft_free_split(args);
+	if (errno == EACCES)
+		return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
+	return (error_msg("pipex: ", args[0], ": execution failed\n"), 1);
 }
