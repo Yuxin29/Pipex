@@ -22,25 +22,17 @@ void	error_msg(char *str1, char *str2, char *str3)
 		ft_putstr_fd(str3, 2);
 }
 
-void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code)
+void	close_and_error(int *fds, const char *msg, int exit_code)
 {
 	if (fds)
 	{
-		if (fds[0] >= 0)
+		if (fds[0] != -1)
 			close(fds[0]);
-		if (fds[1] >= 0)
+		if (fds[1] != -1)
 			close(fds[1]);
 		free(fds);
 	}
-	if (ppfd)
-	{
-		if (ppfd[0] >= 0)
-			close(ppfd[0]);
-		if (ppfd[1] >= 0)
-			close(ppfd[1]);
-	}
-	if (msg)
-		ft_putstr_fd(msg, 2);
+	perror(msg);
 	exit(exit_code);
 }
 

@@ -19,24 +19,7 @@
 */
 
 #include "pipex.h"
-
-// Find "PATH=..." from environmental ptr
-// and then skip "PATH=" and return the path string
-static char	*find_path_in_envp(char **envp)
-{
-	int	i;
-
-	i = 0;
-	if (!envp)
-		return (NULL);
-	while (envp[i])
-	{
-		if (ft_strncmp(envp[i], "PATH=", 5) == 0)
-			return (envp[i] + 5);
-		i++;
-	}
-	return (NULL);
-}
+#include <string.h>
 
 static char	*safe_join(const char *path, const char *cmd)
 {
@@ -62,63 +45,39 @@ static char	*safe_join(const char *path, const char *cmd)
 //access(one_path, X_OK) == 0: check executability,  0 is yes
 static char	*find_command_in_path(char *cmd, char **envp)
 {
-	char	*paths;
-	char	**path;
+	char	*paths = NULL;
+	char	**path = NULL;
 	char	*one_path;
-	int		i;
+	int		j;
 
-	if (ft_strchr(cmd, '/') && access(cmd, X_OK) == 0)
-		return (ft_strdup(cmd));
-	paths = find_path_in_envp(envp);
+	j = 0;
+	while (envp[j])
+	{
+		if (strncmp(envp[j], "PATH=", 5) == 0)
+		{
+			paths = envp[j] + 5;
+			break ;
+		}
+		j++;
+	}
 	if (!paths)
 		return (NULL);
 	path = ft_split(paths, ':');
 	if (!path)
 		return (NULL);
-	i = 0;
-	while (path[i])
+	j = 0;
+	while (path[j])
 	{
-		one_path = safe_join(path[i], cmd);
+		one_path = safe_join(path[j], cmd);
 		if (!one_path)
 			return (ft_free_split(path), NULL);
 		if (access(one_path, X_OK) == 0)
 			return (ft_free_split(path), one_path);
 		free(one_path);
-		i++;
+		j++;
 	}
-	return (ft_free_split(path), NULL);
-}
-
-//this one is going to be called in the main
-//prechecking cmd existence and return a in as signal
-//1 as existing and 0 as non_existing
-int	check_command_existence(char *cmd_line, char **envp)
-{
-	char	**args;
-	char	*path;
-
-	while (*cmd_line == ' ' || *cmd_line == '\t')
-		cmd_line++;
-	if (!cmd_line || !*cmd_line)
-		return (127);
-	args = ft_split(cmd_line, ' ');
-	if (!args || !args[0])
-		return (ft_free_split(args), 127);
-	if (ft_strchr(args[0], '/'))
-	{
-		if (access(args[0], X_OK) == 0)
-			return (ft_free_split(args), 1);
-		else if (access(args[0], F_OK) == 0)
-			return (ft_free_split(args), 126);
-	}
-	else
-	{
-		path = find_command_in_path(args[0], envp);
-		if (path)
-			return (ft_free_split(args), free(path), 1);
-		free(path);
-	}
-	return (ft_free_split(args), 127);
+	ft_free_split(path);
+	return (NULL);
 }
 
 // execution;
@@ -146,13 +105,15 @@ int	exe_cmd(char *cmd_line, char **envp)
 		path = find_command_in_path(args[0], envp);
 	if (!path)
 	{
-		ft_free_split(args);
-		return (error_msg("pipex: ", args[0], ": command not found\n"), 127);
+		error_msg("pipex: ", args[0], ": command not found\n");
+		return (ft_free_split(args), 127);
 	}
 	execve(path, args, envp);
-	free(path);
-	ft_free_split(args);
-	if (errno == EACCES)
+    ft_free_split(args);
+    free(path);
+    if (errno == ENOENT)
+        return (error_msg("pipex: ", args[0], ": No such file or directory\n"), 127);
+    else if (errno == EACCES)
 		return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
-	return (error_msg("pipex: ", args[0], ": execution failed\n"), 1);
+    return (error_msg("pipex: ", args[0], ": Permission denied\n"), 1);
 }
