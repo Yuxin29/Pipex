@@ -50,8 +50,6 @@ static char	*safe_join(const char *path, const char *cmd)
 		return (NULL);
 	result = ft_strjoin(temp, cmd);
 	free (temp);
-	if (!result)
-		free(temp);
 	return (result);
 }
 
