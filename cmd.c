@@ -49,6 +49,7 @@ static char	*safe_join(const char *path, const char *cmd)
 	if (!temp)
 		return (NULL);
 	result = ft_strjoin(temp, cmd);
+	free (temp);
 	if (!result)
 		free(temp);
 	return (result);
@@ -145,27 +146,33 @@ int	check_command_existence(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
-	int		existence;
+	int		result;
 
 	if (!cmd_line || !*cmd_line)
-		return (0);
+		return (127);
 	while (*cmd_line == ' ' || *cmd_line == '\t')
 		cmd_line++;
 	if (!*cmd_line)
-		return (0);
+		return (127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
-		return (ft_free_split(args), 0);
-	existence = 0;
-	if (ft_strchr(args[0], '/') && access(args[0], F_OK) == 0)
-		existence = 1;
+		return (ft_free_split(args), 127);
+
+	result = 127;
+	if (ft_strchr(args[0], '/'))
+	{
+		if (access(args[0], F_OK) == 0)
+			result = (access(args[0], X_OK) == 0) ? 1 : 126;
+	}
 	else
 	{
 		path = find_command_in_path(args[0], envp);
 		if (path)
-			existence = 1;
-		free(path);
+		{
+			result = (access(path, X_OK) == 0) ? 1 : 126;
+			free(path);
+		}
 	}
 	ft_free_split(args);
-	return (existence);
+	return (result);
 }
