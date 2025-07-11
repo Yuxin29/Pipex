@@ -44,16 +44,12 @@ void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code)
 	exit(exit_code);
 }
 
-void	close_all(int	*ppfd, int	*fds)
+void	close_pair(int fd1, int fd2)
 {
-	if (ppfd[0] >= 0)
-		close(ppfd[0]);
-	if (ppfd[1] >= 0)
-		close(ppfd[1]);
-	if (fds[0] >= 0)
-		close(fds[0]);
-	if (fds[1] >= 0)
-		close(fds[1]);
+	if (fd1 >= 0)
+		close(fd1);
+	if (fd2 >= 0)
+		close(fd2);
 }
 
 char	**ft_free_split(char **split)

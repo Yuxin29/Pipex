@@ -96,7 +96,6 @@ int	check_command_existence(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
-	int		result;
 
 	while (*cmd_line == ' ' || *cmd_line == '\t')
 		cmd_line++;
@@ -105,25 +104,21 @@ int	check_command_existence(char *cmd_line, char **envp)
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
 		return (ft_free_split(args), 127);
-	result = 127;
 	if (ft_strchr(args[0], '/'))
 	{
-		if (access(args[0], F_OK) == 0 && access(args[0], X_OK) == 0)
-			result = 1;
-		if (access(args[0], F_OK) == 0 && access(args[0], X_OK) != 0)
-			result = 126;
+		if (access(args[0], X_OK) == 0)
+			return (ft_free_split(args), 1);
+		else if (access(args[0], F_OK) == 0)
+			return (ft_free_split(args), 126);
 	}
 	else
 	{
 		path = find_command_in_path(args[0], envp);
-		if (path && access(path, X_OK) == 0)
-			result = 1;
-		if (path && access(path, X_OK) != 0)
-			result = 126;
+		if (path)
+			return (ft_free_split(args), free(path), 1);
 		free(path);
 	}
-	ft_free_split(args);
-	return (result);
+	return (ft_free_split(args), 127);
 }
 
 // execution;
@@ -136,30 +131,28 @@ int	exe_cmd(char *cmd_line, char **envp)
 {
 	char	**args;
 	char	*path;
-	int		err;
-	int		check;
 
 	if (!cmd_line || !*cmd_line)
 		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
-		return (ft_free_split(args), ft_putstr_fd("pipex: command not found\n", 2), 127);
-	check = check_command_existence(cmd_line, envp);
-	if (ft_strchr(args[0], '/'))
 	{
-		execve(args[0], args, envp);
-		err = errno;
 		ft_free_split(args);
-		if (err == EACCES)
-			return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
-		return (error_msg("pipex: ", args[0], ": execution failed\n"), 1);
+		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
 	}
-	path = find_command_in_path(args[0], envp);
+	if (ft_strchr(args[0], '/'))
+		path = ft_strdup(args[0]);
+	else
+		path = find_command_in_path(args[0], envp);
 	if (!path)
-		return (ft_free_split(args), error_msg("pipex: ", args[0], ": command not found\n"), 127);
+	{
+		ft_free_split(args);
+		return (error_msg("pipex: ", args[0], ": command not found\n"), 127);
+	}
 	execve(path, args, envp);
-	err = errno;
 	free(path);
 	ft_free_split(args);
-	return (error_msg("pipex: ", cmd_line, ": execution failed\n"), 1);
+	if (errno == EACCES)
+		return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
+	return (error_msg("pipex: ", args[0], ": execution failed\n"), 1);
 }

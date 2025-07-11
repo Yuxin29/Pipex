@@ -36,7 +36,7 @@
 //cleaning up: close, free, perror and exit with code
 void	error_msg(char *str1, char *str2, char *str3);
 void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code);
-void	close_all(int *ppfd, int *fds);
+void	close_pair(int fd1, int fd2);
 char	**ft_free_split(char **split);
 
 //cmd.c 
