@@ -207,6 +207,7 @@ int	main(int ac, char **av, char **envp)
 	fds[0] = -1;
 	fds[1] = -1;
 	execute_pipeline(av, envp, wait_status, fds);
+	close_pair(fds[0], fds[1]);
 	free(fds);
 	if (wait_status[0] != 0)
 		exit(1);

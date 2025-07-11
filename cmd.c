@@ -38,6 +38,17 @@ static char	*safe_join(const char *path, const char *cmd)
 	return (result);
 }
 
+static int	is_all_whitespace(const char *s)
+{
+	while (*s)
+	{
+		if (*s != ' ' && *s != '\t' && *s != '\n')
+			return (0);
+		s++;
+	}
+	return (1);
+}
+
 //Searches for the actual binary file of cmd from the PATH= string.
 //esim. inpout	//- cmd = "grep"
 //- path(could be) = "/usr/local/bin:/usr/bin:/bin"
@@ -91,8 +102,8 @@ int	exe_cmd(char *cmd_line, char **envp)
 	char	**args;
 	char	*path;
 
-	if (!cmd_line || !*cmd_line)
-		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
+	if (!cmd_line || !*cmd_line || is_all_whitespace(cmd_line))
+		return (error_msg("pipex: ", ": ", "command not found\n"), 127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
 	{
@@ -108,12 +119,21 @@ int	exe_cmd(char *cmd_line, char **envp)
 		error_msg("pipex: ", args[0], ": command not found\n");
 		return (ft_free_split(args), 127);
 	}
+	errno = 0;
 	execve(path, args, envp);
-    ft_free_split(args);
-    free(path);
-    if (errno == ENOENT)
-        return (error_msg("pipex: ", args[0], ": No such file or directory\n"), 127);
-    else if (errno == EACCES)
-		return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
-    return (error_msg("pipex: ", args[0], ": Permission denied\n"), 1);
+	if (ft_strchr(args[0], '/'))
+		perror(args[0]);
+	else if (errno == ENOENT)
+		error_msg("pipex: ", args[0], ": command not found\n");
+	else if (errno == EACCES)
+		error_msg("pipex: ", args[0], ": Permission denied\n");
+	else
+		error_msg("pipex: ", args[0], ": execution failed\n");
+	ft_free_split(args);
+	free(path);
+	if (errno == ENOENT)
+		return (127);
+	else if (errno == EACCES)
+		return (126);
+	return (1);
 }
