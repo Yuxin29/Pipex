@@ -229,12 +229,8 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 		*wait_status = 126;
 	else if (cmd2_status == 127)
 		*wait_status = 127;
-	else if (WIFEXITED(status2))
-		*wait_status = WEXITSTATUS(status2);
-	//else if (cmd2_status == 126 || (WIFEXITED(status2) && WEXITSTATUS(status2) == 126))
-	//	*wait_status = 126;
 	else
-		*wait_status = 1;
+		*wait_status = WEXITSTATUS(status2);
 	close(fds[0]);
 	close(fds[1]);
 }
