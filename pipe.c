@@ -156,10 +156,10 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 	{
 		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
 		{
-            close(input_fd);
-            close(output_fd);
-            close_and_error(0, 0, "pipex: dup2 failed\n", 1);
-        }
+			close(input_fd);
+    			close(output_fd);
+			close_and_error(0, 0, "pipex: dup2 failed\n", 1);
+		}
 		close(input_fd);
 		close(output_fd);
 		result = exe_cmd(cmd, envp);
@@ -177,7 +177,7 @@ pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 // at the end I firt check init errors
 // and then check 2nd cmd existence,
 // Otherwise keep the status from the last command
-void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
+void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {
 	int		pipefd[2];
 	pid_t	pid1;
@@ -187,6 +187,7 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 	int		file_error;
 	int		cmd1_status;
 	int		cmd2_status;
+	int		null_fd;
 
 	file_error = init_fds(fds, av);
 	if (pipe(pipefd) == -1)
@@ -200,7 +201,7 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 			error_msg("pipex: ", av[2], ": Permission denied\n");
 		else
 			error_msg("pipex: ", av[2], ": command not found\n");
-		int null_fd = open("/dev/null", O_RDONLY);
+		null_fd = open("/dev/null", O_RDONLY);
 		if (null_fd < 0)
 			close_and_error(fds, 0, "pipex: open /dev/null failed\n", 1);
 		pid1 = ft_fork(null_fd, pipefd[1], "true", envp);
@@ -215,7 +216,7 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 			error_msg("pipex: ", av[3], ": Permission denied\n");
 		else
 			error_msg("pipex: ", av[3], ": command not found\n");
-		int null_fd = open("/dev/null", O_RDONLY);
+		null_fd = open("/dev/null", O_RDONLY);
 		if (null_fd < 0)
 			close_and_error(fds, 0, "pipex: open /dev/null failed\n", 1);
 		pid2 = ft_fork(pipefd[0], null_fd, "true", envp);
