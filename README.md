@@ -1,53 +1,26 @@
 # Pipex
 
-prelearning for the later project minishell
+Description
 
+pipex is a simplified shell pipeline emulator written in C, designed to replicate basic Unix pipe functionality.
 
-					a tree structure of how the main.c work
---------------------------------------------------------------------------------
-|						    Parent Process 									   |
-|						   	   {main}										   |
-|                   		(creates pipe)									   |
-|                        		|											   |
-|	         		-----------------------------------						   |
-|   	    		|                        	       |					   |
-|			{first_fork} 							{second_fork} 			   |
-|			[child1_pid]   	        				[child2_pid]			   |
-|    	    		|                   	           |					   |
-|	  ------------------------	     			---------------------		   |
-|	  |          	         |	         		|                   |		   |
-|	Child 1           		Parent	     	Child 2            Parent		   |
-| (exec cmd1)     		 after fork1  	   (exec cmd2)       after fork2	   |
-| 	  |                  	 |     		    	|                    |		   |
-|	  |                   	 |         			|                    |		   |
-|	┌--------------- --─┐    |   	  	┌----------------────┐   	 |		   |
-|	│ close(pipe_fd[0]) │  	 |     		│ close(pipe_fd[1])  │	     |		   |
-|	│ dup2(infile, 0)   │  	 |	     	│ dup2(pipe_fd[0], 0)│   	 |		   |
-|	│ dup2(pipe_fd[1],1)│ 	 | 	    	│ dup2(outfile, 1)   │   	 |	       |
-|	│   {exe_cmd1}      |    |          |   {exe_cmd2}       |       |		   |
-|	|execve(grep hello) │  	 |     		│ execve(wc -l)      │   	 |		   |
-|	└-----------------──┘  	 |    		└----------------────┘   	 |		   |
-|    	                  	 |                              		 |		   |
-|							{main}									 |	       |
-|					 Parent closes both ends of pipe                 |		   |
-|            	     waitpid(child1_pid)                             |		   |
-|                	 waitpid(child2_pid)							 |		   |
-|                	 wifexited() //macros                            |		   |
--------------------------------------------------------------------------------|
+The program executes two commands with an input and output file, connecting the first command's output to the second command's input via a pipe, similar to: < infile cmd1 | cmd2 > outfile
 
-					a liner structure of how the pipe work
---------------------------------------------------------------------------------
-|			fd0			fd1	     /-------/\		fd0			  fd1			   |
-| infile  ----->  cmd1  ----->  |  pipe |  |  ----->   cmd2  ------>   outfile |
-|       (infile_fd)   pipefd[1]  \ _____ \ / (pipefd[0])  (outfile_fd)   	   |
-|                     write_side		      read_side                        |
-|                             \             / 							   	   |
-|                              \ pipefd[2] /							       |
-|                               /      |     \		   					  	   |
-|                         first_fork   |  	second_fork					       |
-|                           (cmd1)     |      (cmd2)				           |
-|                         (child 1)    |    (child 2) 					       |
---------------------------------------------------------------------------------
+Exit Codes
+    0: Success
+    1: General error (e.g., file open failure)
+    126: Command found but not executable (permission denied)
+    127: Command not found
+    128 + signal: If child terminated by signal (e.g., segmentation fault)
+
+Known Limitations
+
+    Supports exactly two commands in the pipeline
+    Does not support shell built-in commands (e.g., cd, export)
+    No support for shell expansions or quotes parsing
+    Minimal error messages without colors or formatting
+    False positive in some valrind test from system leak
+    
 
 ---------------------new variable types used here--------------------------------
 - pid_t is a data type used in POSIX systems (like Linux and macOS) to represent process IDs. 
