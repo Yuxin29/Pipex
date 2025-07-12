@@ -12,10 +12,11 @@
 
 #include "pipex.h"
 
+//it gives error message of 126 and 127
 void	error_126(int st, char *str)
 {
 	if (st == 126)
-		error_msg(str, NULL, ": Permission denied\n");
+		error_msg("pipex: ", str, ": Permission denied\n");
 	else if (st == 127 && (!str || *str == '\0'))
 		ft_putstr_fd("pipex: command not found\n", 2);
 	else if (st == 127)

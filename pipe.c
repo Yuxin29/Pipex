@@ -26,10 +26,9 @@ it is silently closed before being reused.
 * If oldfd is valid, and newfd has the same value as oldfd,
   then dup2() does nothing, and returns newfd.
 PRPTOTYPE
-int dup(int oldfd);
 int dup2(int oldfd, int newfd);
---------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
 					a tree structure of how the main.c work
 --------------------------------------------------------------------------------
 |						    Parent Process 									   |
@@ -59,9 +58,7 @@ int dup2(int oldfd, int newfd);
 |					 Parent closes both ends of pipe                 |		   |
 |            	     waitpid(child1_pid)                             |		   |
 |                	 waitpid(child2_pid)							 |		   |
-|                	 wifexited() //macros                            |		   |
 -------------------------------------------------------------------------------|
-
 					a liner structure of how the pipe work
 --------------------------------------------------------------------------------
 |			fd0			 fd1     /-------/\		fd0			  fd1			   |
@@ -87,8 +84,8 @@ int dup2(int oldfd, int newfd);
 |            (Redirect stdin to pipe read)  	(Redirect stdout to outfile)   |
 --------------------------------------------------------------------------------
 
-execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
-
+execve(cmd_line[0], cmd_line, envp); 
+If execve returns, it failed
 | Exit Code | Meaning                 |
 | --------- | ----------------------- |
 | `127`     | Command not found       |
@@ -98,13 +95,40 @@ execve(cmd_line[0], cmd_line, envp); // If execve returns, it failed
 | `0`       | Second Command Succeeds |
 | `0`       | SFile Operations Succeed|
 
+--------------------------------------------------------------------------------
+defensive fd check:
+env -i PATH=/bin:/usr/bin ./pipex Makefile cat cat outf
+call this at the begining of main to check if opened fds from os or me
+#include <fcntl.h>
+void print_inherited_fds(void)
+{
+	int fd;
+	int max_fd = sysconf(_SC_OPEN_MAX);
+	if (max_fd == -1)
+		max_fd = 1024;
+	printf("Inherited open FDs at program start:\n");
+	for (fd = 3; fd < max_fd; fd++)
+	{
+		if (fcntl(fd, F_GETFD) != -1)
+			printf("  FD %d is open\n", fd);
+	}
+}
+
+defensive reasoning for early exit on open null fd failure
+- the Failure here indicates a severe system-level error
+- an immediate early exit is justified. 
+- This ensures no undefined behavior or orphaned child processes occur. 
+- The timing impact is negligible due to the rarity of this failure.
+- The correctness, safety, and reliability of a program 
+- OUTWEIGH the minor timing difference caused by early exit here.
+
+-----------------------------------------------------------------------------
 */
 
 #include "pipex.h"
 
-//initiate file descripter.
 //fds given as 2 int array, malloced in main, so no malloc failuere here
-//return an int as error signal: 1 as failures and 0 as success
+//change the fds and return an int signal: 1 as failures and 0 as success
 //out_no_write: outfile exists but not writable
 static int	init_fds(int *fds, char **av)
 {
@@ -126,16 +150,16 @@ static int	init_fds(int *fds, char **av)
 			fds[1] = open("/dev/null", O_WRONLY);
 	}
 	if (fds[0] < 0 || fds[1] < 0)
-		return (error_msg("pipex: ", NULL, ": open null failed\n"), 1);
+		return (error_msg("pipex: ", "internal", ": open null failed\n"), 1);
 	if (out_no_write)
 		return (1);
 	return (0);
 }
 
-//I have one fork for 2 process, adust the av and fds when called 
+//one fork for 2 process, adust the av and fds when called 
 //On  success, 0 is returned in child, child process is returned in the parent;
 //On failure, -1 is returned, no child process is created
-//error msgs here: fork and dup2 failure
+//error msgs here: fork and dup2 failure, not cmd or file err msgs here
 static pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 {
 	pid_t	pid;
@@ -163,6 +187,10 @@ static pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 }
 
 //first child
+//only null_open failure msg here
+// here I first precheck cmd existence
+// if yes I fork it.
+// if not I still go fork a true cmd
 static pid_t	child1(char **av, char **envp, int input_fd, int pipe_write)
 {
 	pid_t	pid;
@@ -181,20 +209,17 @@ static pid_t	child1(char **av, char **envp, int input_fd, int pipe_write)
 	return (pid);
 }
 
-// Here I first check initd_fds erros and save it as file error
-// here I first precheck cmd existence
-// if yes I fork it.
-// if not I still go fork a true cmd
-// at the end I firt check init errors
+//here is the pipe process and child2
+// Here I first check initd_fds erros and save it as wait_status[0]
 // and then check 2nd cmd existence,
 // Otherwise keep the status from the last command
-void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
+void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 {
 	int		pipefd[2];
 	pid_t	pid1;
 	pid_t	pid2;
+	int		null_fd;
 
-	wait_status[0] = init_fds(fds, av);
 	if (pipe(pipefd) == -1)
 		close_and_error(fds, 0, "pipex: pipe failed\n", 127);
 	pid1 = child1(av, envp, fds[0], pipefd[1]);
@@ -205,7 +230,11 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 	else
 	{
 		error_126(wait_status[1], av[3]);
+		null_fd = open("/dev/null", O_RDONLY);
+		if (null_fd < 0)
+			close_and_error(fds, pipefd, "pipex: open /dev/null failed\n", 1);
 		pid2 = ft_fork(pipefd[0], fds[1], "true", envp);
+		close(null_fd);
 	}
 	close(pipefd[0]);
 	waitpid(pid1, &wait_status[2], 0);
@@ -213,12 +242,13 @@ void execute_pipeline(char **av, char **envp, int *wait_status, int *fds)
 	close_pair(fds[0], fds[1]);
 }
 
-
+//main
 //fds[2] malloced and preset here at beginning and exit ealy here if fails
-//at the end:
-//WIFEXITED		Normal exit			Child's exit() code		Common (0 or 127)
-//WIFSIGNALED	Killed by signal	128 + signal number		Crashes
-//otherwise		raw status
+// wait_status is an int array of storing status codes used for final exit.
+// wait_status[0] : Result of init_fds() — initialization of input/output files.
+// wait_status[1] : Status of the cmd1 existence check. reused for cmd2 too
+// wait_status[2] : Raw exit status of the child1 process (cmd1). unchecked here
+// wait_status[3] : Raw exit status of the child2 process (cmd2).
 int	main(int ac, char **av, char **envp)
 {
 	int	*fds;
@@ -231,6 +261,7 @@ int	main(int ac, char **av, char **envp)
 		close_and_error(fds, 0, "malloc error\n", 1);
 	fds[0] = -1;
 	fds[1] = -1;
+	wait_status[0] = init_fds(fds, av);
 	execute_pipeline(av, envp, wait_status, fds);
 	free(fds);
 	if (wait_status[0])

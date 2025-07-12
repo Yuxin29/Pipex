@@ -32,6 +32,8 @@
 # include <errno.h>
 # include "./libft/libft.h"
 
+# define ERR_SPLIT "pipex: split failed\n"
+
 //helper.c 
 //cleaning up: close, free, perror and exit with code
 void	error_126(int st, char *str);
