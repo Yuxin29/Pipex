@@ -20,6 +20,22 @@
 
 #include "pipex.h"
 
+//costomized double strjoin, to be used in exe cmd.
+static char	*safe_join(const char *path, const char *cmd)
+{
+	char	*temp;
+	char	*result;
+
+	if (!path || !cmd)
+		return (NULL);
+	temp = ft_strjoin(path, "/");
+	if (!temp)
+		return (NULL);
+	result = ft_strjoin(temp, cmd);
+	free (temp);
+	return (result);
+}
+
 // Find "PATH=..." from environmental ptr
 // and then skip "PATH=" and return the path string
 static char	*find_path_in_envp(char **envp)
@@ -38,25 +54,10 @@ static char	*find_path_in_envp(char **envp)
 	return (NULL);
 }
 
-static char	*safe_join(const char *path, const char *cmd)
-{
-	char	*temp;
-	char	*result;
-
-	if (!path || !cmd)
-		return (NULL);
-	temp = ft_strjoin(path, "/");
-	if (!temp)
-		return (NULL);
-	result = ft_strjoin(temp, cmd);
-	free (temp);
-	return (result);
-}
-
 //Searches for the actual binary file of cmd from the PATH= string.
-//esim. inpout	//- cmd = "grep"
+//eg. inpout cmd = "grep"
 //- path(could be) = "/usr/local/bin:/usr/bin:/bin"
-//esim. output	//- "/bin/grep"
+//eg. output	//- "/bin/grep"
 //access(one_path, X_OK) == 0: check executability,  0 is yes
 static char	*find_command_in_path(char *cmd, char **envp)
 {
@@ -87,9 +88,44 @@ static char	*find_command_in_path(char *cmd, char **envp)
 	return (ft_free_split(path), NULL);
 }
 
+// execution;
+// About Error Management
+// I try to do it so, if there are null in the 2 static above, 
+// it only give error signals here but not exit, pass the exit code to main
+// because in the main, there might be reacheable mem of fds if exit here
+int	exe_cmd(char *cmd_line, char **envp)
+{
+	char	**args;
+	char	*path;
+
+	while (*cmd_line == ' ' || *cmd_line == '\t')
+		cmd_line++;
+	if (!cmd_line || !*cmd_line)
+		return (ft_putstr_fd("pipex: empty command\n", 2), 127);
+	args = ft_split(cmd_line, ' ');
+	if (!args || !args[0])
+	{
+		ft_putstr_fd("pipex: getting command failed\n", 2);
+		return (ft_free_split(args), 127);
+	}
+	if (ft_strchr(args[0], '/'))
+		path = ft_strdup(args[0]);
+	else
+		path = find_command_in_path(args[0], envp);
+	if (!path)
+		return (ft_free_split(args), 127);
+	execve(path, args, envp);
+	free(path);
+	if (errno == EACCES)
+		return (ft_free_split(args), 126);
+	error_msg("pipex: ", args[0], ": execution failed\n");
+	return (ft_free_split(args), 1);
+}
+
 //this one is going to be called in the main
 //prechecking cmd existence and return a in as signal
 //1 as existing and 0 as non_existing
+//this one only send error msg for ft_split failure
 int	check_command_existence(char *cmd_line, char **envp)
 {
 	char	**args;
@@ -101,7 +137,10 @@ int	check_command_existence(char *cmd_line, char **envp)
 		return (127);
 	args = ft_split(cmd_line, ' ');
 	if (!args || !args[0])
+	{
+		ft_putstr_fd("pipex: getting command failed\n", 2);
 		return (ft_free_split(args), 127);
+	}
 	if (ft_strchr(args[0], '/'))
 	{
 		if (access(args[0], X_OK) == 0)
@@ -114,40 +153,6 @@ int	check_command_existence(char *cmd_line, char **envp)
 		path = find_command_in_path(args[0], envp);
 		if (path)
 			return (ft_free_split(args), free(path), 1);
-		free(path);
 	}
 	return (ft_free_split(args), 127);
-}
-
-// execution;
-// first try to execute a relative or absolute path
-// About Error Management
-// I try to do it so, if there are null in the 2 static above, 
-// it only give error signals here but not exit, pass the exit code to main
-// because in the main, there might be reacheable mem of fds if exit here
-int	exe_cmd(char *cmd_line, char **envp)
-{
-	char	**args;
-	char	*path;
-
-	if (!cmd_line || !*cmd_line)
-		return (ft_putstr_fd("pipex: command not found\n", 2), 127);
-	args = ft_split(cmd_line, ' ');
-	if (!args || !args[0])
-		return (ft_free_split(args), ft_putstr_fd("pipex: command not found\n", 2), 127);
-	if (ft_strchr(args[0], '/'))
-		path = ft_strdup(args[0]);
-	else
-		path = find_command_in_path(args[0], envp);
-	if (!path)
-	{
-		ft_free_split(args);
-		return (error_msg("pipex: ", args[0], ": command not found\n"), 127);
-	}
-	execve(path, args, envp);
-	free(path);
-	ft_free_split(args);
-	if (errno == EACCES)
-		return (error_msg("pipex: ", args[0], ": Permission denied\n"), 126);
-	return (error_msg("pipex: ", args[0], ": execution failed\n"), 1);
 }

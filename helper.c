@@ -15,9 +15,16 @@
 void	error_126(int st, char *str)
 {
 	if (st == 126)
-		error_msg("pipex: ", str, ": Permission denied\n");
-	else
-		error_msg("pipex: ", str, ": command not found\n");
+		error_msg(str, NULL, ": Permission denied\n");
+	else if (st == 127 && (!str || *str == '\0'))
+		ft_putstr_fd("pipex: command not found\n", 2);
+	else if (st == 127)
+	{
+		if (ft_strchr(str, '/'))
+			error_msg(str, NULL, ": No such file or directory\n");
+		else
+			error_msg("pipex: ", str, ": command not found\n");
+	}
 }
 
 void	error_msg(char *str1, char *str2, char *str3)
@@ -34,19 +41,11 @@ void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code)
 {
 	if (fds)
 	{
-		if (fds[0] >= 0)
-			close(fds[0]);
-		if (fds[1] >= 0)
-			close(fds[1]);
+		close_pair(fds[0], fds[1]);
 		free(fds);
 	}
 	if (ppfd)
-	{
-		if (ppfd[0] >= 0)
-			close(ppfd[0]);
-		if (ppfd[1] >= 0)
-			close(ppfd[1]);
-	}
+		close_pair(ppfd[0], ppfd[1]);
 	if (msg)
 		ft_putstr_fd(msg, 2);
 	exit(exit_code);

@@ -42,16 +42,13 @@ char	**ft_free_split(char **split);
 
 //cmd.c 
 //find paths, find cmd, and execute cmds, and return the exit code to main
-//prechecking command existence and return signals of (0/1)
-//cleaning up: close, free, perror and exit with code
+//prechecking command existence and return signals of (1 / 126 / 127)
+//error msgs here: empty cmd, split failure and execution failure
 int		exe_cmd(char *cmd_line, char **envp);
 int		check_command_existence(char *cmd_line, char **envp);
 
 //main.c
-//main process, excution function: building pipe, call fk and clean up;
-// one static init_fds inside that give fds signals but not exits
-// below are fts that might exit
-pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp);
-void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds);
+//main process, excution function: building pipe, call fk;
+//void	execute_pipeline(char **av, char **envp, int *wait_status, int *fds);
 int		main(int ac, char **av, char **envp);
 #endif
