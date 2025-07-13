@@ -41,10 +41,7 @@ void	error_msg(char *str1, char *str2, char *str3)
 void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code)
 {
 	if (fds)
-	{
 		close_pair(fds[0], fds[1]);
-		free(fds);
-	}
 	if (ppfd)
 		close_pair(ppfd[0], ppfd[1]);
 	if (msg)
@@ -55,9 +52,15 @@ void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code)
 void	close_pair(int fd1, int fd2)
 {
 	if (fd1 >= 0)
+	{
 		close(fd1);
+		fd1 = -1;
+	}
 	if (fd2 >= 0)
+	{
 		close(fd2);
+		fd2 = -1;
+	}
 }
 
 char	**ft_free_split(char **split)

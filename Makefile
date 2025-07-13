@@ -6,12 +6,12 @@
 #    By: yuwu <yuwu@student.hive.fi>                +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/06/03 16:36:29 by yuwu              #+#    #+#              #
-#    Updated: 2025/06/22 13:18:42 by yuwu             ###   ########.fr        #
+#    Updated: 2025/07/13 13:13:25 by yuwu             ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME := pipex
-CFLAGS := -Wall -Wextra -Werror
+CFLAGS := -Wall -Wextra -Werror -g
 CC := cc
 
 SRCS := cmd.c pipe.c helper.c

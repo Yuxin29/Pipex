@@ -18,7 +18,6 @@
 #include <string.h> //strerror
 # include <errno.h> //errno?
 # include <sys/wait.h> //WIFEXITED(status)
-# include "./libft/libft.h"
 */
 
 #ifndef PIPEX_H
@@ -27,7 +26,6 @@
 # include <unistd.h>
 # include <stdlib.h>
 # include <fcntl.h>
-# include <stdio.h>
 # include <sys/wait.h>
 # include <errno.h>
 # include "./libft/libft.h"
