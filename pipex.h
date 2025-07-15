@@ -38,7 +38,7 @@ void	error_126(int st, char *str);
 void	error_msg(char *str1, char *str2, char *str3);
 void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code);
 void	close_pair(int fd1, int fd2);
-char	**ft_free_split(char **split);
+void	free_split(char **split);
 
 //cmd.c 
 //find paths, find cmd, and execute cmds, and return the exit code to main

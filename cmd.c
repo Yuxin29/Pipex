@@ -79,13 +79,13 @@ static char	*find_command_in_path(char *cmd, char **envp)
 	{
 		one_path = safe_join(path[i], cmd);
 		if (!one_path)
-			return (ft_free_split(path), NULL);
+			return (free_split(path), NULL);
 		if (access(one_path, X_OK) == 0)
-			return (ft_free_split(path), one_path);
+			return (free_split(path), one_path);
 		free(one_path);
 		i++;
 	}
-	return (ft_free_split(path), NULL);
+	return (free_split(path), NULL);
 }
 
 // execution;
@@ -107,20 +107,20 @@ int	exe_cmd(char *cmd_line, char **envp)
 	if (!args)
 	{
 		ft_putstr_fd(ERR_SPLIT, 2);
-		return (ft_free_split(args), 127);
+		return (free_split(args), 127);
 	}
 	if (ft_strchr(args[0], '/'))
 		path = ft_strdup(args[0]);
 	else
 		path = find_command_in_path(args[0], envp);
 	if (!path)
-		return (ft_free_split(args), 127);
+		return (free_split(args), 127);
 	execve(path, args, envp);
 	free(path);
 	if (errno == EACCES)
-		return (ft_free_split(args), 126);
+		return (free_split(args), 126);
 	error_msg("pipex: ", args[0], ": execution failed\n");
-	return (ft_free_split(args), 1);
+	return (free_split(args), 1);
 }
 
 //prechecking cmd existence and return a in as signal

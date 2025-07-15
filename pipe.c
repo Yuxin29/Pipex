@@ -148,8 +148,6 @@ static int	init_fds(int *fds, char **av)
 	{
 		error_msg("pipex: ", av[1], ": Permission denied\n");
 		fds[0] = open("/dev/null", O_RDONLY);
-		if (fds[0] < 0)
-			ft_putstr_fd("pipex: open /dev/null failed\n", 2);
 	}
 	if (!out_no_write)
 		fds[1] = open(av[4], O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -158,9 +156,9 @@ static int	init_fds(int *fds, char **av)
 		error_msg("pipex: ", av[4], ": Permission denied\n");
 		if (fds[1] < 0)
 			fds[1] = open("/dev/null", O_WRONLY);
-		if (fds[1] < 0)
-			ft_putstr_fd("pipex: open /dev/null failed\n", 2);
 	}
+	if (fds[0] < 0 || fds[1] < 0)
+		ft_putstr_fd("pipex: open /dev/null failed\n", 2);
 	if (fds[0] < 0 || fds[1] < 0 || out_no_write)
 		return (1);
 	return (0);
@@ -177,19 +175,12 @@ static pid_t	ft_fork(int input_fd, int output_fd, char *cmd, char **envp)
 
 	pid = fork();
 	if (pid == -1)
-	{
-		close_pair(input_fd, output_fd);
 		ft_putstr_fd("pipex: fork failed\n", 2);
-	}
 	if (pid == 0)
 	{
 		if (dup2(input_fd, 0) == -1 || dup2(output_fd, 1) == -1)
-		{
-			close_pair(input_fd, output_fd);
 			ft_putstr_fd("pipex: dup2 failed\n", 2);
-		}
 		close_fds_from(3);
-		close_pair(input_fd, output_fd);
 		result = exe_cmd(cmd, envp);
 		exit(result);
 	}

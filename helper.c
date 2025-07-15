@@ -63,12 +63,12 @@ void	close_pair(int fd1, int fd2)
 	}
 }
 
-char	**ft_free_split(char **split)
+void	free_split(char **split)
 {
 	size_t	i;
 
 	if (!split)
-		return (NULL);
+		return ;
 	i = 0;
 	while (split[i])
 	{
@@ -76,5 +76,5 @@ char	**ft_free_split(char **split)
 		i++;
 	}
 	free(split);
-	return (NULL);
+	return ;
 }
