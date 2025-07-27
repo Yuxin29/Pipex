@@ -10,16 +10,6 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-/*
-#include <unistd.h> //write, open, access, dup, dup2, execve, fork, pipe
-#include <stdlib.h> //malloc, free, exit
-#include <fcntl.h> //open
-#include <stdio.h> //write, perror
-#include <string.h> //strerror
-# include <errno.h> //errno?
-# include <sys/wait.h> //WIFEXITED(status)
-*/
-
 #ifndef PIPEX_H
 # define PIPEX_H
 
@@ -28,7 +18,7 @@
 # include <fcntl.h>
 # include <sys/wait.h>
 # include <errno.h>
-# include "./libft/libft.h"
+# include "libft.h"
 
 # define ERR_SPLIT "pipex: split failed\n"
 
@@ -38,7 +28,7 @@ void	error_126(int st, char *str);
 void	error_msg(char *str1, char *str2, char *str3);
 void	close_and_error(int *fds, int ppfd[2], char *msg, int exit_code);
 void	close_pair(int fd1, int fd2);
-void	free_split(char **split);
+void	close_fds_from(int start);
 
 //cmd.c 
 //find paths, find cmd, and execute cmds, and return the exit code to main

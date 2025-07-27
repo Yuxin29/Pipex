@@ -63,18 +63,15 @@ void	close_pair(int fd1, int fd2)
 	}
 }
 
-void	free_split(char **split)
+//defensicve closing
+void	close_fds_from(int start)
 {
-	size_t	i;
+	int	i;
 
-	if (!split)
-		return ;
-	i = 0;
-	while (split[i])
+	i = start;
+	while (i < 1024)
 	{
-		free(split[i]);
+		close(i);
 		i++;
 	}
-	free(split);
-	return ;
 }
