@@ -35,6 +35,7 @@ make
 
 ## Project Structure
 
+```
 include/
 ├── pipex.h
 src/
@@ -44,3 +45,4 @@ src/
 Makefile
 README.md
 
+```
