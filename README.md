@@ -14,7 +14,7 @@
 1. Clone the Module Directory
 
 ```
-git clone https://github.com/Yuxin29/pipex.git
+git clone https://github.com/Yuxin29/pipex.git pipex
 cd pipex
 ```
 
